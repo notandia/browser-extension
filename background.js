@@ -10,6 +10,7 @@ const {
   createStartRateLimiter,
   derivePrimaryStatus,
   normalizeCrossrefEvents,
+  normalizeCrossrefUpdateRecords,
   normalizeDOI,
   summarizeIntegrityRecords
 } = integrityApi;
@@ -80,13 +81,13 @@ function normalizeIntegrityInput(data) {
   return Array.from(unique.values());
 }
 
-function setBadge(tabId, count, color = '#E2211C', title = 'MDPI Filter') {
+function setBadge(tabId, count, color = '#E2211C', title = 'Notandia') {
   if (!Number.isInteger(tabId)) return;
   const numericCount = Number.isFinite(count) ? Math.max(0, Math.min(999, Math.trunc(count))) : 0;
   const safeColor = typeof color === 'string' && SAFE_COLOR.test(color) ? color : '#E2211C';
   chrome.action.setBadgeText({ tabId, text: numericCount ? String(numericCount) : '' });
   chrome.action.setBadgeBackgroundColor({ tabId, color: safeColor });
-  chrome.action.setTitle({ tabId, title: String(title || 'MDPI Filter').slice(0, 200) });
+  chrome.action.setTitle({ tabId, title: String(title || 'Notandia').slice(0, 200) });
 }
 
 function refreshBadge(tabId) {
@@ -98,7 +99,7 @@ function refreshBadge(tabId) {
     return;
   }
   const legacy = legacyBadgeData.get(tabId);
-  setBadge(tabId, legacy?.count || 0, legacy?.color || '#E2211C', 'MDPI Filter');
+  setBadge(tabId, legacy?.count || 0, legacy?.color || '#E2211C', 'Notandia');
 }
 
 function cancelIntegrityScan(tabId) {
@@ -147,34 +148,46 @@ async function hasIntegrityTransmissionConsent() {
   }
 }
 
+async function fetchCrossrefJson(url, controller) {
+  await waitForCrossrefStart();
+  const response = await fetch(url, {
+    method: 'GET',
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
+    headers: { Accept: 'application/json' },
+    signal: controller.signal
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Crossref returned HTTP ${response.status}`);
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().includes('json')) throw new Error('Crossref returned a non-JSON response');
+  return response.json();
+}
+
 async function fetchCrossrefRecord(doi, scan) {
   const cached = integrityCache.get(doi);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  if (scan.cancelled) return { lookupStatus: 'cancelled', events: [] };
-  await waitForCrossrefStart();
   if (scan.cancelled) return { lookupStatus: 'cancelled', events: [] };
 
   const controller = new AbortController();
   scan.controllers.add(controller);
   const timeout = setTimeout(() => controller.abort(), CROSSREF_TIMEOUT_MS);
   try {
-    const response = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`, {
-      method: 'GET',
-      credentials: 'omit',
-      referrerPolicy: 'no-referrer',
-      headers: { Accept: 'application/json' },
-      signal: controller.signal
-    });
-    if (response.status === 404) {
-      const value = { lookupStatus: 'not-found', events: [] };
-      integrityCache.set(doi, { expiresAt: Date.now() + CROSSREF_CACHE_MS, value });
-      return value;
+    const singletonUrl = `https://api.crossref.org/works/${encodeURIComponent(doi)}`;
+    const singletonPayload = await fetchCrossrefJson(singletonUrl, controller);
+    if (scan.cancelled) return { lookupStatus: 'cancelled', events: [] };
+
+    let events = normalizeCrossrefEvents(singletonPayload?.message);
+    if (!events.length) {
+      const updatesUrl = `https://api.crossref.org/works?filter=updates:${encodeURIComponent(doi)}&rows=100`;
+      const updatesPayload = await fetchCrossrefJson(updatesUrl, controller);
+      events = normalizeCrossrefUpdateRecords(updatesPayload?.message?.items, doi);
     }
-    if (!response.ok) throw new Error(`Crossref returned HTTP ${response.status}`);
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.toLowerCase().includes('application/json')) throw new Error('Crossref returned a non-JSON response');
-    const payload = await response.json();
-    const value = { lookupStatus: 'checked', events: normalizeCrossrefEvents(payload?.message) };
+
+    const value = {
+      lookupStatus: singletonPayload || events.length ? 'checked' : 'not-found',
+      events
+    };
     integrityCache.set(doi, { expiresAt: Date.now() + CROSSREF_CACHE_MS, value });
     return value;
   } catch (error) {
