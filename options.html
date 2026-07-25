@@ -2,54 +2,99 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Notandia Options</title>
-  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Notandia Options</h1>
-    <p>Select how MDPI results are handled on search sites:</p>
-    <label class="radio">
-      <input type="radio" name="mode" value="highlight">
-      <span>Highlight MDPI results</span>
-    </label>
-    <label class="radio">
-      <input type="radio" name="mode" value="hide">
-      <span>Hide MDPI results</span>
-    </label>
-    <hr class="separator">
-    <h2>Potential MDPI Site Highlighting (Google Search Only)</h2>
-    <div class="setting-item">
-      <label class="checkbox-label" for="highlightPotentialMdpiOptions">
-        <input type="checkbox" id="highlightPotentialMdpiOptions" name="highlightPotentialMdpiOptions">
-        <span>Highlight sites potentially linking to MDPI content</span>
-      </label>
-    </div>
-    <div class="setting-item">
-      <label for="potentialMdpiColorOptions" class="color-label">Highlight Color:</label>
-      <input type="color" id="potentialMdpiColorOptions" name="potentialMdpiColorOptions" class="color-picker-input">
-    </div>
-    <hr class="separator">
-    <div class="setting-item">
-      <label class="checkbox-label" for="loggingEnabledOptions">
-        <input type="checkbox" id="loggingEnabledOptions" name="loggingEnabledOptions">
-        <span>Enable Extension Logging</span>
-      </label>
-    </div>
-    <!-- Advanced Settings -->
-    <hr class="separator">
-    <p class="settings-title">Advanced Settings</p>
-    <div class="setting-item">
-      <label class="checkbox-label" for="ncbiApiEnabledOptions">
-        <input type="checkbox" id="ncbiApiEnabledOptions" name="ncbiApiEnabledOptions">
-        <span>Enable NCBI API lookups</span>
-        <span class="setting-warning">Disabling reduces accuracy, leading to missed or incorrect highlights.</span>
-      </label>
-    </div>
-    <button id="save">Save</button>
-    <div id="status"></div>
-  </div>
+  <main class="options-shell">
+    <header class="options-header">
+      <img src="icons/icon-64.png" width="56" height="56" alt="">
+      <div>
+        <h1>Notandia preferences</h1>
+        <p>Choose which publishers you want on your personal watchlist and how matched literature should appear.</p>
+      </div>
+    </header>
 
+    <aside class="notice">
+      <strong>Publisher profiles are identification and display rules—not objective quality scores.</strong>
+      MDPI and Frontiers are enabled and highlighted by default, but either can be disabled or assigned a different action.
+    </aside>
+
+    <section class="panel" aria-labelledby="profilesHeading">
+      <div class="section-heading">
+        <div>
+          <h2 id="profilesHeading">Publisher watchlists</h2>
+          <p>Confirmed matches use publisher domains or DOI prefixes. Potential name-only matches are optional per profile.</p>
+        </div>
+      </div>
+      <div class="profile-table-header" aria-hidden="true">
+        <span>Publisher</span><span>Enabled</span><span>Action</span><span>Color</span><span>Confidence</span><span></span>
+      </div>
+      <div id="profileRows" class="profile-rows"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="customHeading">
+      <h2 id="customHeading">Add a custom publisher</h2>
+      <p class="help">Custom profiles accept data only. They cannot run scripts or inject custom selectors.</p>
+      <div class="custom-grid">
+        <label>Publisher name<input id="customName" type="text" maxlength="80" placeholder="Example Publishing Group"></label>
+        <label>Domains<input id="customDomains" type="text" placeholder="example.org, journals.example.org"></label>
+        <label>DOI prefixes<input id="customDoiPrefixes" type="text" placeholder="10.1234, 10.5678"></label>
+        <label>Default action
+          <select id="customAction">
+            <option value="highlight">Highlight</option>
+            <option value="badge">Badge only</option>
+            <option value="dim">Dim</option>
+            <option value="hide">Hide</option>
+            <option value="none">No page styling</option>
+          </select>
+        </label>
+        <label>Color<input id="customColor" type="color" value="#48627A"></label>
+        <label>Confidence
+          <select id="customConfidence">
+            <option value="verified-only">Verified matches only</option>
+            <option value="include-potential">Include name-only potential matches</option>
+          </select>
+        </label>
+      </div>
+      <button id="addCustom" type="button">Add publisher</button>
+      <div id="customStatus" class="status" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="transferHeading">
+      <h2 id="transferHeading">Import or export profiles</h2>
+      <p class="help">Exported JSON contains only publisher profile settings. Imported data is validated and normalized.</p>
+      <textarea id="profileJson" rows="9" spellcheck="false" placeholder="Publisher profile JSON"></textarea>
+      <div class="button-row">
+        <button id="exportProfiles" class="secondary" type="button">Export</button>
+        <button id="importProfiles" class="secondary" type="button">Import</button>
+      </div>
+      <div id="transferStatus" class="status" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="networkHeading">
+      <h2 id="networkHeading">Metadata and diagnostics</h2>
+      <label class="toggle-row" for="integrityLookupsEnabledOptions">
+        <input id="integrityLookupsEnabledOptions" type="checkbox">
+        <span><strong>Check formal integrity metadata</strong><small>Sends normalized DOI identifiers to Crossref. New Chrome and Edge installs enable this by default; existing installs and Firefox remain opt-in unless already enabled.</small></span>
+      </label>
+      <label class="toggle-row" for="ncbiApiEnabledOptions">
+        <input id="ncbiApiEnabledOptions" type="checkbox">
+        <span><strong>Use NCBI identifier resolution</strong><small>Improves publisher detection when pages expose only PMID or PMCID identifiers.</small></span>
+      </label>
+      <label class="toggle-row" for="loggingEnabledOptions">
+        <input id="loggingEnabledOptions" type="checkbox">
+        <span><strong>Diagnostic logging</strong><small>Logs extension processing details locally in browser developer tools.</small></span>
+      </label>
+    </section>
+
+    <footer class="save-bar">
+      <button id="save" type="button">Save all preferences</button>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+    </footer>
+  </main>
+  <script src="shared/publisher_profiles.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
