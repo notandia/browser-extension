@@ -98,11 +98,18 @@ test('browser runtime loads publisher profile modules before scanners', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   const scripts = manifest.content_scripts[0].js;
   assert.ok(scripts.indexOf('shared/publisher_profiles.js') < scripts.indexOf('content/publisher_scanner.js'));
+  assert.ok(scripts.indexOf('content/publisher_state_bridge.js') < scripts.indexOf('content/content_script.js'));
   assert.equal(manifest.background.service_worker, 'service_worker.js');
   const firefox = JSON.parse(fs.readFileSync(path.join(root, 'platforms', 'firefox', 'manifest.json'), 'utf8'));
-  assert.deepEqual(firefox.background.scripts.slice(0, 3), [
+  assert.deepEqual(firefox.background.scripts, [
     'shared/integrity.js',
     'shared/publisher_profiles.js',
-    'publisher_background.js'
+    'badge_coordinator.js',
+    'publisher_background.js',
+    'crossref_update_adapter.js',
+    'background.js'
   ]);
+  const serviceWorker = fs.readFileSync(path.join(root, 'service_worker.js'), 'utf8');
+  assert.match(serviceWorker, /badge_coordinator\.js/);
+  assert.match(serviceWorker, /crossref_update_adapter\.js/);
 });
