@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   build:
@@ -26,7 +28,29 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Run security and regression tests
-        run: npm test
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set +e
+          npm test > test-output.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            {
+              echo '### Temporary CI diagnostic'
+              echo
+              echo '```text'
+              tail -n 100 test-output.log
+              echo '```'
+            } > diagnostic.md
+            if [ -n "${PR_NUMBER:-}" ]; then
+              gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file diagnostic.md
+            fi
+            cat test-output.log
+            exit "$status"
+          fi
+          cat test-output.log
 
       - name: Build all browser targets
         run: npm run build
