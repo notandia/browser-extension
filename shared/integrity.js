@@ -121,6 +121,30 @@
     });
   }
 
+  function normalizeCrossrefUpdateRecords(items, queriedDoi) {
+    const targetDoi = normalizeDOI(queriedDoi || '');
+    if (!targetDoi || !Array.isArray(items)) return [];
+    const updatedBy = [];
+    for (const item of items.slice(0, 100)) {
+      if (!item || typeof item !== 'object') continue;
+      const noticeDoi = normalizeDOI(item.DOI || item.doi || '');
+      const relations = Array.isArray(item['update-to']) ? item['update-to'] : [];
+      for (const relation of relations) {
+        if (!relation || normalizeDOI(relation.DOI || relation.doi || '') !== targetDoi) continue;
+        updatedBy.push({
+          DOI: noticeDoi,
+          type: relation.type,
+          label: relation.label,
+          source: relation.source || item.source || 'crossref',
+          'record-id': relation['record-id'] ?? relation.recordId ?? null,
+          updated: relation.updated || item.updated || item.created || item.published || null,
+          date: relation.date || item?.published?.['date-time'] || item?.created?.['date-time'] || null
+        });
+      }
+    }
+    return normalizeCrossrefEvents({ 'updated-by': updatedBy });
+  }
+
   function derivePrimaryStatus(events) {
     const list = Array.isArray(events) ? events : [];
     if (!list.length) return null;
@@ -207,8 +231,9 @@
     createStartRateLimiter,
     derivePrimaryStatus,
     normalizeCrossrefEvents,
+    normalizeCrossrefUpdateRecords,
     normalizeDOI,
     normalizeUpdateType,
     summarizeIntegrityRecords
   });
-});
+})();
