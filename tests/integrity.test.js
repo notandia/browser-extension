@@ -12,6 +12,7 @@ const {
   createStartRateLimiter,
   derivePrimaryStatus,
   normalizeCrossrefEvents,
+  normalizeCrossrefUpdateRecords,
   normalizeDOI,
   normalizeUpdateType,
   summarizeIntegrityRecords
@@ -49,6 +50,21 @@ test('only updated-by relationships classify the queried work', () => {
   assert.equal(events[0].status, 'retracted');
   assert.equal(events[0].recordId, 42);
   assert.equal(events[0].noticeDoi, '10.1000/notice');
+});
+
+test('Crossref reverse update records detect the retracted Nature reference', () => {
+  const events = normalizeCrossrefUpdateRecords([{
+    DOI: '10.1038/s41586-024-07653-0',
+    'update-to': [{
+      DOI: '10.1038/nature00870',
+      type: 'retraction',
+      source: 'crossref',
+      updated: { 'date-time': '2024-06-18T00:00:00Z' }
+    }]
+  }], '10.1038/nature00870');
+  assert.equal(events.length, 1);
+  assert.equal(events[0].status, 'retracted');
+  assert.equal(events[0].noticeDoi, '10.1038/s41586-024-07653-0');
 });
 
 test('reinstatement supersedes an older retraction without deleting history', () => {
@@ -93,31 +109,46 @@ test('request-start limiter spaces concurrent callers', async () => {
   assert.deepEqual(sleeps, [250, 250, 250, 250]);
 });
 
-test('integrity network behavior is explicit opt-in and cancellable', () => {
+test('integrity defaults distinguish new Chromium installs from existing users and Firefox', () => {
   const scanner = fs.readFileSync(path.join(root, 'content', 'integrity_scanner.js'), 'utf8');
   const popup = fs.readFileSync(path.join(root, 'popup.js'), 'utf8');
   const background = fs.readFileSync(path.join(root, 'background.js'), 'utf8');
+  const publisherBackground = fs.readFileSync(path.join(root, 'publisher_background.js'), 'utf8');
+  const adapter = fs.readFileSync(path.join(root, 'crossref_update_adapter.js'), 'utf8');
   assert.match(scanner, /integrityLookupsEnabled:\s*false/);
   assert.match(scanner, /integrityLookupsEnabled !== true/);
-  assert.match(popup, /integrityLookupsEnabled:\s*false/);
-  assert.match(popup, /integrityLookupsEnabled === true/);
+  assert.match(publisherBackground, /reason === 'install'/);
+  assert.match(publisherBackground, /updates\.integrityLookupsEnabled = !usesFirefoxDataConsent\(\)/);
+  assert.match(publisherBackground, /reason === 'update'/);
+  assert.match(publisherBackground, /updates\.integrityLookupsEnabled = false/);
   assert.match(background, /function cancelIntegrityScan/);
   assert.match(background, /controller\.abort\(\)/);
   assert.match(background, /hasIntegrityTransmissionConsent/);
+  assert.match(adapter, /filter=updates:/);
+  assert.match(adapter, /credentials: 'omit'/);
+  assert.match(adapter, /referrerPolicy: 'no-referrer'/);
+  assert.match(popup, /permissions\.request\(\{ data_collection: \['websiteContent'\] \}\)/);
+  assert.match(popup, /permissions\.remove\(\{ data_collection: \['websiteContent'\] \}\)/);
 });
 
-test('all browser targets load the integrity runtime safely', () => {
+test('all browser targets load the integrated runtime safely', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   const firefox = JSON.parse(fs.readFileSync(path.join(root, 'platforms', 'firefox', 'manifest.json'), 'utf8'));
-  const popup = fs.readFileSync(path.join(root, 'popup.js'), 'utf8');
-  assert.equal(manifest.background.service_worker, 'background.js');
+  assert.equal(manifest.background.service_worker, 'service_worker.js');
   assert.equal(Object.hasOwn(manifest.background, 'type'), false);
   assert.ok(manifest.content_scripts[0].js.includes('content/integrity_scanner.js'));
-  assert.deepEqual(firefox.background.scripts.slice(0, 2), ['shared/integrity.js', 'background.js']);
+  assert.ok(manifest.content_scripts[0].js.includes('content/publisher_scanner.js'));
+  assert.ok(manifest.content_scripts[0].css.includes('content/publisher_compatibility.css'));
+  assert.deepEqual(firefox.background.scripts, [
+    'shared/integrity.js',
+    'shared/publisher_profiles.js',
+    'badge_coordinator.js',
+    'publisher_background.js',
+    'crossref_update_adapter.js',
+    'background.js'
+  ]);
   assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '140.0');
   assert.equal(firefox.browser_specific_settings.gecko_android.strict_min_version, '142.0');
   assert.deepEqual(firefox.browser_specific_settings.gecko.data_collection_permissions.required, ['none']);
   assert.deepEqual(firefox.browser_specific_settings.gecko.data_collection_permissions.optional, ['websiteContent']);
-  assert.match(popup, /permissions\.request\(\{ data_collection: \['websiteContent'\] \}\)/);
-  assert.match(popup, /permissions\.remove\(\{ data_collection: \['websiteContent'\] \}\)/);
 });
