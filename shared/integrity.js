@@ -6,24 +6,12 @@
   root.MDPIIntegrity = api;
 })(typeof globalThis === 'object' ? globalThis : this, () => {
   const STATUS_DEFINITIONS = Object.freeze({
-    retracted: Object.freeze({
-      key: 'retracted', label: 'Retracted', shortLabel: 'Retracted', icon: '×', color: '#B42318', severity: 100
-    }),
-    'expression-of-concern': Object.freeze({
-      key: 'expression-of-concern', label: 'Expression of concern', shortLabel: 'Concern', icon: '!', color: '#B54708', severity: 80
-    }),
-    withdrawn: Object.freeze({
-      key: 'withdrawn', label: 'Withdrawn or removed', shortLabel: 'Withdrawn', icon: '–', color: '#475467', severity: 70
-    }),
-    'duplicate-publication': Object.freeze({
-      key: 'duplicate-publication', label: 'Duplicate publication', shortLabel: 'Duplicate', icon: '≡', color: '#6941C6', severity: 60
-    }),
-    corrected: Object.freeze({
-      key: 'corrected', label: 'Corrected', shortLabel: 'Corrected', icon: '✎', color: '#175CD3', severity: 40
-    }),
-    reinstated: Object.freeze({
-      key: 'reinstated', label: 'Reinstated', shortLabel: 'Reinstated', icon: '↩', color: '#067647', severity: 30
-    })
+    retracted: Object.freeze({ key: 'retracted', label: 'Retracted', shortLabel: 'Retracted', icon: '×', color: '#B42318', severity: 100 }),
+    'expression-of-concern': Object.freeze({ key: 'expression-of-concern', label: 'Expression of concern', shortLabel: 'Concern', icon: '!', color: '#B54708', severity: 80 }),
+    withdrawn: Object.freeze({ key: 'withdrawn', label: 'Withdrawn or removed', shortLabel: 'Withdrawn', icon: '–', color: '#475467', severity: 70 }),
+    'duplicate-publication': Object.freeze({ key: 'duplicate-publication', label: 'Duplicate publication', shortLabel: 'Duplicate', icon: '≡', color: '#6941C6', severity: 60 }),
+    corrected: Object.freeze({ key: 'corrected', label: 'Corrected', shortLabel: 'Corrected', icon: '✎', color: '#175CD3', severity: 40 }),
+    reinstated: Object.freeze({ key: 'reinstated', label: 'Reinstated', shortLabel: 'Reinstated', icon: '↩', color: '#067647', severity: 30 })
   });
 
   const TYPE_MAP = new Map([
@@ -43,11 +31,7 @@
   function normalizeDOI(value) {
     if (typeof value !== 'string') return null;
     let normalized = value.trim();
-    try {
-      normalized = decodeURIComponent(normalized);
-    } catch {
-      // Keep malformed percent-encoded input unchanged.
-    }
+    try { normalized = decodeURIComponent(normalized); } catch { /* Keep malformed percent-encoded input unchanged. */ }
     normalized = normalized
       .replace(/^doi\s*:\s*/i, '')
       .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '')
@@ -121,6 +105,30 @@
     });
   }
 
+  function normalizeCrossrefUpdateRecords(items, queriedDoi) {
+    const targetDoi = normalizeDOI(queriedDoi || '');
+    if (!targetDoi || !Array.isArray(items)) return [];
+    const updatedBy = [];
+    for (const item of items.slice(0, 100)) {
+      if (!item || typeof item !== 'object') continue;
+      const noticeDoi = normalizeDOI(item.DOI || item.doi || '');
+      const relations = Array.isArray(item['update-to']) ? item['update-to'] : [];
+      for (const relation of relations) {
+        if (!relation || normalizeDOI(relation.DOI || relation.doi || '') !== targetDoi) continue;
+        updatedBy.push({
+          DOI: noticeDoi,
+          type: relation.type,
+          label: relation.label,
+          source: relation.source || item.source || 'crossref',
+          'record-id': relation['record-id'] ?? relation.recordId ?? null,
+          updated: relation.updated || item.updated || item.created || item.published || null,
+          date: relation.date || item?.published?.['date-time'] || item?.created?.['date-time'] || null
+        });
+      }
+    }
+    return normalizeCrossrefEvents({ 'updated-by': updatedBy });
+  }
+
   function derivePrimaryStatus(events) {
     const list = Array.isArray(events) ? events : [];
     if (!list.length) return null;
@@ -162,20 +170,14 @@
       for (const status of statuses) if (Object.hasOwn(counts, status)) counts[status] += 1;
       if (record?.primaryStatus) {
         affected += 1;
-        if (!primaryStatus || STATUS_DEFINITIONS[record.primaryStatus].severity > STATUS_DEFINITIONS[primaryStatus].severity) {
-          primaryStatus = record.primaryStatus;
-        }
+        if (!primaryStatus || STATUS_DEFINITIONS[record.primaryStatus].severity > STATUS_DEFINITIONS[primaryStatus].severity) primaryStatus = record.primaryStatus;
       }
     }
-    return {
-      total: Math.max(Number(totalRequested) || 0, normalizedRecords.length), checked, failed, affected, counts, primaryStatus
-    };
+    return { total: Math.max(Number(totalRequested) || 0, normalizedRecords.length), checked, failed, affected, counts, primaryStatus };
   }
 
   function badgeForSummary(summary) {
-    if (!summary?.affected || !summary.primaryStatus) {
-      return { count: 0, color: '#667085', title: 'No known integrity signals' };
-    }
+    if (!summary?.affected || !summary.primaryStatus) return { count: 0, color: '#667085', title: 'No known integrity signals' };
     const definition = STATUS_DEFINITIONS[summary.primaryStatus];
     return {
       count: Math.min(999, Math.max(0, Number(summary.affected) || 0)),
@@ -207,6 +209,7 @@
     createStartRateLimiter,
     derivePrimaryStatus,
     normalizeCrossrefEvents,
+    normalizeCrossrefUpdateRecords,
     normalizeDOI,
     normalizeUpdateType,
     summarizeIntegrityRecords
