@@ -24,9 +24,7 @@ test('one source tree generates isolated Notandia browser packages', () => {
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
 
-    const locale = JSON.parse(
-      fs.readFileSync(path.join(ROOT, '_locales', 'en', 'messages.json'), 'utf8')
-    );
+    const locale = JSON.parse(fs.readFileSync(path.join(ROOT, '_locales', 'en', 'messages.json'), 'utf8'));
     assert.equal(locale.extName.message, 'Notandia');
 
     const chrome = readManifest('chrome');
@@ -41,12 +39,22 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(manifest.action.default_title, 'Notandia');
       assert.equal(manifest.homepage_url, 'https://mdpi-filter.pages.dev/');
       assert.deepEqual(manifest.permissions, ['storage']);
+      assert.ok(manifest.content_scripts[0].js.includes('shared/publisher_profiles.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/integrity_scanner.js'));
+      assert.ok(manifest.content_scripts[0].js.includes('content/publisher_scanner.js'));
+      assert.ok(manifest.content_scripts[0].css.includes('content/publisher_compatibility.css'));
     }
 
-    assert.equal(chrome.background.service_worker, 'background.js');
-    assert.equal(edge.background.service_worker, 'background.js');
-    assert.deepEqual(firefox.background.scripts, ['shared/integrity.js', 'background.js']);
+    assert.equal(chrome.background.service_worker, 'service_worker.js');
+    assert.equal(edge.background.service_worker, 'service_worker.js');
+    assert.deepEqual(firefox.background.scripts, [
+      'shared/integrity.js',
+      'shared/publisher_profiles.js',
+      'badge_coordinator.js',
+      'publisher_background.js',
+      'crossref_update_adapter.js',
+      'background.js'
+    ]);
     assert.equal(Object.hasOwn(firefox.background, 'service_worker'), false);
     assert.equal(Object.hasOwn(firefox.background, 'type'), false);
     assert.equal(firefox.browser_specific_settings.gecko.id, 'browser-extension@notandia.github.io');
@@ -55,8 +63,15 @@ test('one source tree generates isolated Notandia browser packages', () => {
 
     for (const target of ['chrome', 'edge', 'firefox', 'safari']) {
       assert.equal(fs.existsSync(path.join(DIST, target, 'background.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'publisher_background.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'badge_coordinator.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'crossref_update_adapter.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'integrity.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'publisher_profiles.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_scanner.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'publisher_scanner.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'publisher_state_bridge.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'publisher_compatibility.css')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'content_script.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'scripts')), false);
       assert.equal(fs.existsSync(path.join(DIST, target, 'tests')), false);
