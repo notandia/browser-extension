@@ -1,8 +1,8 @@
 # Notandia browser extension
 
-**Notandia** is an independent, open-source browser extension that adds publisher context and explainable post-publication signals while preserving the existing MDPI-detection features previously distributed as **MDPI Filter**. This repository is the canonical browser-extension source for Chrome, Microsoft Edge, Firefox, and Safari.
+**Notandia** is an independent, open-source browser extension for configurable publisher context and explainable formal post-publication signals. It is the public successor to **MDPI Filter** and uses one canonical source tree for Chrome, Microsoft Edge, Firefox, and Safari.
 
-> **Independent project:** Notandia is not affiliated with, authorized by, or endorsed by MDPI AG, Crossref, Retraction Watch, NCBI, browser vendors, or any publisher or data provider. MDPI is a registered brand of MDPI AG.
+> **Independent project:** Notandia is not affiliated with, authorized by, or endorsed by MDPI AG, Frontiers Media, Crossref, Retraction Watch, NCBI, browser vendors, or any publisher or data provider. Publisher profiles identify content and apply user preferences; they are not objective publisher-quality scores.
 
 ## Browser outputs
 
@@ -10,34 +10,58 @@
 |---|---|---|
 | Chrome | `notandia-chrome-vX.Y.Z.zip` | Uploadable to the existing Chrome Web Store item |
 | Microsoft Edge | `notandia-edge-vX.Y.Z.zip` | Uploadable to the existing Microsoft Edge Add-ons product |
-| Firefox | `notandia-firefox-source-vX.Y.Z.zip` | Submitted to AMO for Mozilla signing |
+| Firefox | `notandia-firefox-source-vX.Y.Z.zip` | First submission to AMO for Mozilla signing |
 | Safari | `notandia-safari-source-vX.Y.Z.zip` | Local compatibility source; App Store publication deferred |
 
 All packages are generated from the same source commit. Browser-specific manifests, store metadata, terminology restrictions, and credentials remain isolated.
 
 ## Features
 
-- Hide or highlight MDPI results on Google, Google Scholar, PubMed, and Europe PMC.
-- Mark MDPI entries in reference lists.
-- Mark related inline numerical citations where page structure permits.
-- Identify MDPI entries in cited-by and similar-article sections.
-- Show detected references in the toolbar popup and scroll to a selected reference.
-- Resolve PMID and PMCID identifiers through NCBI when direct DOI evidence is unavailable.
-- Optionally check the current article and DOI-bearing references for formal Crossref/Retraction Watch update relationships.
-- Show evidence type, chronology, provenance, coverage, deferred checks, and unresolved checks instead of producing an opaque quality score.
-- Keep research-integrity lookups off by default and allow NCBI and integrity network features to be disabled independently.
+### Personal publisher watchlists
+
+- Built-in MDPI and Frontiers profiles are enabled with **Highlight** as the initial default.
+- Every publisher, including MDPI and Frontiers, can be disabled independently.
+- Each profile supports **Badge only**, **Highlight**, **Dim**, **Hide**, or **No page styling**.
+- Colors and confirmed-versus-potential matching policy are configurable per publisher.
+- Users can add validated custom profiles with publisher domains and DOI prefixes.
+- Profile settings can be imported and exported as normalized JSON.
+- Publisher matching is performed locally in the browser.
+- Search results, current articles, bibliography entries, and supported related-article sections can be annotated.
+
+### Formal integrity signals
+
+- Checks the current article and DOI-bearing references for formal Crossref update relationships.
+- Reports retractions, expressions of concern, corrections, reinstatements, withdrawals/removals, and duplicate-publication relationships when present in checked metadata.
+- Queries both a work's singleton Crossref record and reverse `updates:<doi>` relationships, covering notices stored as separate records.
+- Shows evidence type, chronology, source, coverage, deferred checks, and unresolved checks rather than producing an opaque quality score.
+- Formal integrity status and publisher classification remain independent.
+
+### Integrated context and reporting
+
+- Combines publisher-profile matches and formal integrity events in one popup.
+- Scrolls from a detected reference in the popup to the corresponding bibliography item where page structure permits.
+- Provides structured reporting for missed/wrong publishers, confidence errors, missing/wrong integrity signals, layout problems, and suggested publisher presets.
+- Prefilled reports omit query strings, URL fragments, citation text, and DOI lists unless the user adds them manually.
+
+## Defaults and migration
+
+- New Chrome, Edge, and Safari installations enable integrity checks because they are a core Notandia feature.
+- Existing MDPI Filter installations do not silently enable new Crossref transmission when updated.
+- Firefox keeps integrity checks opt-in because `websiteContent` is declared as optional data collection and must be granted by the user.
+- Existing MDPI `highlight`/`hide` and potential-match preferences migrate into the MDPI publisher profile.
+- MDPI remains fully deactivable after migration.
 
 ## Identity and update compatibility
 
-Notandia is a public-facing rebrand of released software, not a replacement extension. Existing store items and technical identities are retained so installed copies continue to receive updates.
+Notandia is a public-facing rebrand of released Chrome, Edge, and Zotero software, not a replacement store item.
 
 - Chrome keeps its existing extension ID and registered CRX signing key.
 - Microsoft Edge keeps its existing Product ID and extension identity.
-- Firefox keeps the released Gecko ID `mdpi-filter@mdpi-filter.org`.
-- Existing storage keys and MDPI-specific runtime identifiers remain where changing them could reset settings or break compatibility.
+- Firefox has not been released and uses the new Gecko ID `browser-extension@notandia.github.io`.
+- Existing storage keys and MDPI-specific internal identifiers remain only where changing them could reset settings or break upgrade compatibility.
 - New release files, store-facing metadata, UI labels, documentation, and public project links use Notandia.
 
-These legacy identifiers are compatibility mechanisms, not current product branding. See [Identity compatibility](docs/IDENTITY_COMPATIBILITY.md).
+See [Identity compatibility](docs/IDENTITY_COMPATIBILITY.md).
 
 ## Development
 
@@ -81,9 +105,9 @@ A protected version tag such as `v0.1.0` triggers the multi-browser release work
 5. Verifies each archive and manifest.
 6. Publishes one GitHub release with all four packages and `checksums.txt`.
 
-Store publication is intentionally separate from package creation. The **Publish Browser Store** workflow downloads the already verified release asset, checks its SHA-256 hash, and then uploads or submits it through the official store mechanism behind a protected GitHub Environment.
+Store publication is separate from package creation. The **Publish Browser Store** workflow downloads an already verified release asset, checks its SHA-256 hash, and uploads or submits it through the official store mechanism behind a protected GitHub Environment.
 
-See [Multi-browser releases and store publication](docs/MULTI_BROWSER_RELEASES.md) for the exact account, secret, environment, and migration setup.
+See [Multi-browser releases and store publication](docs/MULTI_BROWSER_RELEASES.md).
 
 ## Local installation
 
@@ -120,14 +144,14 @@ The extension:
 
 - Uses Manifest V3 or the browser's compatible Web Extension form.
 - Requests only `storage` as a standard extension permission.
-- Executes no remote code.
-- Includes no runtime npm dependencies.
-- Keeps Crossref integrity lookups off until the user explicitly enables them.
-- Sends only bounded scholarly identifiers to documented APIs.
+- Executes no remote code and has no runtime npm dependencies.
+- Performs publisher-profile matching locally.
+- Stores only validated profile and feature preferences in browser synchronization storage.
+- Sends normalized DOI identifiers to Crossref only when integrity checks are enabled for that installation.
 - Limits an integrity scan to 50 unique DOI requests and no more than four request starts per second.
 - Cancels active and queued integrity requests when disabled, replaced by a newer scan, or navigation begins.
 - Omits browser credentials and referrer information from NCBI and Crossref requests.
-- Does not send complete page text, citation text, full URLs, search queries, browsing history, account identifiers, or analytics identifiers to the integrity provider.
+- Does not send complete page text, citation text, full URLs, search queries, browsing history, account identifiers, or analytics identifiers to Crossref.
 - Supports a zero-network configuration.
 - Uses pinned GitHub Actions and deterministic release inputs.
 
@@ -135,11 +159,11 @@ See [SECURITY.md](SECURITY.md), [PRIVACY.md](PRIVACY.md), and the project websit
 
 ## Known limitations
 
-Some publisher pages use nonstandard, dynamically loaded, collapsed, or author-year citation structures. Reference-list detection can work even when inline-citation marking or scroll-to-reference cannot be performed safely. False-positive avoidance takes priority over guessing from weak journal-title evidence.
+Publisher identification depends on available domain, DOI, and metadata evidence. Potential name-only matching is optional because it is less reliable. Some dynamically loaded or unusual page structures may prevent safe annotation or scrolling.
 
-Integrity coverage depends on DOI availability and the formal relationships present in the checked Crossref records. A result saying no known signal was found is not a guarantee that a work is correct or reliable. Deferred, failed, and unresolved checks are not treated as clear.
+Integrity coverage depends on DOI availability and the formal relationships present in Crossref. “No known signal” is not a guarantee that a work is correct or reliable; deferred, failed, and unresolved checks are not treated as clear.
 
-Representative regression pages include PubMed Central, Europe PMC, Nature, Cell, BMJ, ScienceDirect, Wiley, Sage, Taylor & Francis, Oxford Academic, LWW, and Wikipedia pages. Regressions should be filed with the page URL, browser/version, extension version, expected result, and actual result.
+Representative regression pages include PubMed Central, Europe PMC, Nature, Frontiers, MDPI, Cell, BMJ, ScienceDirect, Wiley, Sage, Taylor & Francis, Oxford Academic, LWW, and Wikipedia.
 
 ## License
 
