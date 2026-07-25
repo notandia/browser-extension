@@ -1,0 +1,50 @@
+name: Finalize Crossref update lookup fix
+
+on:
+  push:
+    branches:
+      - fix/crossref-update-lookup
+    paths:
+      - scripts/finalize-crossref-fix.py
+      - .github/workflows/finalize-crossref-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: fix/crossref-update-lookup
+          persist-credentials: true
+
+      - name: Apply syntax correction and regression fixture
+        run: python3 scripts/finalize-crossref-fix.py
+
+      - name: Run tests
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Verify branch
+        run: |
+          npm ci --ignore-scripts
+          npm test
+
+      - name: Commit final fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add shared/integrity.js tests/integrity.test.js
+          if git diff --cached --quiet; then
+            echo "Crossref fix already finalized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test: cover Crossref reverse update relationships"
+          git push origin HEAD:fix/crossref-update-lookup
