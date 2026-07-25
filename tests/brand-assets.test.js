@@ -25,7 +25,7 @@ test('Notandia master symbol is a self-contained accessible SVG', () => {
   assert.match(source, /#F8FAFC/);
   assert.match(source, /#FFC857/);
   assert.doesNotMatch(source, /<text\b/);
-  assert.doesNotMatch(source, /https?:\/\//);
+  assert.doesNotMatch(source, /(?:href|xlink:href)=["']https?:\/\//i);
 });
 
 test('committed extension icons have the declared square dimensions', () => {
