@@ -4,7 +4,7 @@
     "description": "The name of the extension."
   },
   "extDesc": {
-    "message": "Open-source publisher context and formal post-publication signals for scholarly literature.",
+    "message": "Configurable publisher watchlists and formal post-publication signals for scholarly literature.",
     "description": "A short description of the extension's purpose."
   }
 }
