@@ -38,8 +38,12 @@
       "matches": [
         "https://*/*"
       ],
+      "css": [
+        "content/publisher_compatibility.css"
+      ],
       "js": [
         "shared/publisher_profiles.js",
+        "content/publisher_state_bridge.js",
         "content/utils.js",
         "content/sanitizer.js",
         "content/domains.js",
