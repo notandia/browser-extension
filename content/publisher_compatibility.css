@@ -1,0 +1,34 @@
+/* Neutralize the legacy MDPI-only visual layer. The configurable publisher
+   scanner reapplies selected actions with inline !important declarations. */
+.mdpi-highlighted-reference,
+.mdpi-potential-reference,
+.mdpi-highlighted-google,
+.mdpi-potential-google,
+.mdpi-search-result-highlight,
+.potential-mdpi-site-highlight,
+.mdpi-highlighted-similar-article,
+[data-mdpi-filter-cited-by-styled] {
+  border: revert !important;
+  border-left: revert !important;
+  border-radius: revert !important;
+  padding: revert !important;
+  padding-left: revert !important;
+  background-color: revert !important;
+  opacity: revert !important;
+  filter: revert !important;
+  outline: revert !important;
+}
+
+.mdpi-hidden-reference,
+.mdpi-search-result-hidden {
+  display: revert !important;
+}
+
+/* Preserve the historical inline citation marker only when MDPI remains
+   enabled with the Highlight action. Disabling MDPI or choosing another
+   action removes the old red inline treatment. */
+html:not([data-notandia-mdpi-action="highlight"]) [data-mdpi-filter-inline-styled],
+html:not([data-notandia-mdpi-action="highlight"]) [data-mdpi-filter-inline-styled] * {
+  color: inherit !important;
+  font-weight: inherit !important;
+}
