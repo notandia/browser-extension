@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Notandia</title>
+  <desc id="desc">A geometric N with a highlighted note point, representing scholarly context worth noticing.</desc>
+  <rect x="64" y="64" width="896" height="896" rx="224" fill="#12263F"/>
+  <path d="M292 736V304" fill="none" stroke="#F8FAFC" stroke-width="128" stroke-linecap="round"/>
+  <path d="M326 700L704 324" fill="none" stroke="#F8FAFC" stroke-width="128" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M748 414V736" fill="none" stroke="#F8FAFC" stroke-width="128" stroke-linecap="round"/>
+  <circle cx="748" cy="286" r="82" fill="#FFC857"/>
+</svg>
