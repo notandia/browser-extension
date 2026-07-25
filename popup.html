@@ -9,77 +9,94 @@
 <body>
   <main class="container">
     <header class="popup-header">
-      <div>
-        <h1>Notandia</h1>
-        <p class="product-subtitle">Open-source context for scholarly literature</p>
+      <div class="brand-heading">
+        <img src="icons/icon-32.png" width="32" height="32" alt="">
+        <div>
+          <h1>Notandia</h1>
+          <p>Publisher context and formal integrity signals</p>
+        </div>
       </div>
-      <button id="settingsIcon" class="icon-button" title="Settings" aria-label="Open settings" aria-expanded="false">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33A1.65 1.65 0 0 0 14 20.83V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15 1.65 1.65 0 0 0 3.17 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.92 4 1.65 1.65 0 0 0 10 2.49V2a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 3.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 8 1.65 1.65 0 0 0 20.83 9H21a2 2 0 1 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z"></path>
-        </svg>
-      </button>
+      <button id="settingsIcon" class="icon-button" type="button" aria-label="Open quick settings" aria-expanded="false">⚙</button>
     </header>
 
-    <section id="settingsPanel" class="settings-panel" aria-label="Extension settings">
-      <p class="settings-title">Search-result handling</p>
-      <label class="radio"><input type="radio" name="mode" value="highlight"><span>Highlight MDPI results</span></label>
-      <label class="radio"><input type="radio" name="mode" value="hide"><span>Hide MDPI results</span></label>
-
-      <hr class="separator">
-      <p class="settings-title">Research-integrity lookups</p>
-      <label class="checkbox-label" for="integrityLookupsEnabled">
+    <section id="settingsPanel" class="settings-panel" aria-label="Quick settings">
+      <label class="toggle-row" for="integrityLookupsEnabled">
         <input type="checkbox" id="integrityLookupsEnabled">
-        <span>
-          Check article and reference DOIs
-          <small>Off by default. When enabled, only DOI identifiers are sent to Crossref; page text and browsing history are not transmitted.</small>
-        </span>
+        <span><strong>Integrity checks</strong><small>Checks normalized DOIs with Crossref. Firefox asks before sharing website-content identifiers.</small></span>
       </label>
-
-      <hr class="separator">
-      <p class="settings-title">Potential MDPI sites</p>
-      <label class="checkbox-label" for="highlightPotentialMdpi"><input type="checkbox" id="highlightPotentialMdpi"><span>Highlight potential sites on Google</span></label>
-      <div class="setting-item"><label for="potentialMdpiColor" class="color-label">Highlight color</label><input type="color" id="potentialMdpiColor" class="color-picker-input"></div>
-
-      <hr class="separator">
-      <p class="settings-title">Advanced</p>
-      <label class="checkbox-label" for="loggingEnabled"><input type="checkbox" id="loggingEnabled" name="loggingEnabled"><span>Enable extension logging</span></label>
-      <label class="checkbox-label" for="ncbiApiEnabledPopup">
+      <label class="toggle-row" for="ncbiApiEnabledPopup">
         <input type="checkbox" id="ncbiApiEnabledPopup">
-        <span>Enable NCBI lookups<small>Disabling this reduces MDPI detection accuracy.</small></span>
+        <span><strong>NCBI resolution</strong><small>Improves publisher detection when a page exposes only PubMed identifiers.</small></span>
       </label>
-      <button id="save">Save settings</button>
+      <label class="toggle-row" for="loggingEnabled">
+        <input type="checkbox" id="loggingEnabled">
+        <span><strong>Diagnostic logging</strong><small>Off by default.</small></span>
+      </label>
+      <div class="settings-actions">
+        <button id="saveQuickSettings" type="button">Save</button>
+        <button id="managePublishers" class="secondary" type="button">Manage publishers</button>
+      </div>
       <div id="status" role="status" aria-live="polite"></div>
     </section>
 
-    <section class="integrity-section" aria-labelledby="integrityHeading">
+    <section class="card" aria-labelledby="articleHeading">
       <div class="section-heading-row">
-        <div><h2 id="integrityHeading">Integrity signals</h2><p id="integrityCoverage" class="coverage-text">Integrity lookups are disabled.</p></div>
-        <button id="rescanIntegrity" class="text-button" type="button">Rescan</button>
+        <div>
+          <h2 id="articleHeading">Current page</h2>
+          <p id="pageCoverage" class="coverage-text">Scanning publisher context…</p>
+        </div>
+        <button id="rescan" class="text-button" type="button">Rescan</button>
       </div>
+      <div id="articleContext" class="article-context">
+        <p class="placeholder">No publisher profile or formal integrity signal detected yet.</p>
+      </div>
+    </section>
 
+    <section class="card" aria-labelledby="signalsHeading">
+      <div class="section-heading-row">
+        <div>
+          <h2 id="signalsHeading">Formal integrity signals</h2>
+          <p id="integrityCoverage" class="coverage-text">Loading…</p>
+        </div>
+      </div>
       <div id="integrityStatusGrid" class="status-grid" aria-label="Integrity signal counts">
-        <div class="status-card status-retracted" data-status="retracted"><span class="status-icon" aria-hidden="true">×</span><strong id="countRetracted">0</strong><span>Retracted</span></div>
-        <div class="status-card status-concern" data-status="expression-of-concern"><span class="status-icon" aria-hidden="true">!</span><strong id="countConcern">0</strong><span>Concern</span></div>
-        <div class="status-card status-corrected" data-status="corrected"><span class="status-icon" aria-hidden="true">✎</span><strong id="countCorrected">0</strong><span>Corrected</span></div>
-        <div class="status-card status-reinstated" data-status="reinstated"><span class="status-icon" aria-hidden="true">↩</span><strong id="countReinstated">0</strong><span>Reinstated</span></div>
-        <div class="status-card status-duplicate" data-status="duplicate-publication"><span class="status-icon" aria-hidden="true">≡</span><strong id="countDuplicate">0</strong><span>Duplicate</span></div>
-        <div class="status-card status-withdrawn" data-status="withdrawn"><span class="status-icon" aria-hidden="true">–</span><strong id="countWithdrawn">0</strong><span>Withdrawn</span></div>
+        <div class="status-card status-retracted"><span>×</span><strong id="countRetracted">0</strong><small>Retracted</small></div>
+        <div class="status-card status-concern"><span>!</span><strong id="countConcern">0</strong><small>Concern</small></div>
+        <div class="status-card status-corrected"><span>✎</span><strong id="countCorrected">0</strong><small>Corrected</small></div>
+        <div class="status-card status-other"><span>•</span><strong id="countOther">0</strong><small>Other updates</small></div>
       </div>
-
-      <p class="signal-disclaimer">No signal means only that none was found in the checked sources—not that a work is safe or reliable.</p>
-      <ul id="integrityList" class="integrity-list"><li id="integrityPlaceholder" class="placeholder">Enable lookups in settings to check DOI status metadata.</li></ul>
+      <p class="disclaimer">No signal means only that none was found in checked metadata—not that a work is reliable.</p>
     </section>
 
-    <hr class="separator">
-    <section aria-labelledby="mdpiReferencesHeading">
-      <h2 id="mdpiReferencesHeading"><span id="referencesCount">Loading</span> MDPI references</h2>
-      <div id="referencesListContainer"><ul id="referencesList"><li id="referencesPlaceholder" class="placeholder">Loading references…</li></ul></div>
+    <section class="card" aria-labelledby="itemsHeading">
+      <div class="section-heading-row">
+        <div>
+          <h2 id="itemsHeading">Matched literature</h2>
+          <p id="itemsCoverage" class="coverage-text">Waiting for publisher and integrity results…</p>
+        </div>
+      </div>
+      <ul id="contextItems" class="context-list">
+        <li class="placeholder">No matched references or search results.</li>
+      </ul>
     </section>
 
-    <hr class="separator">
-    <button id="reportIssue" class="secondary">Report a detection issue</button>
+    <section class="card report-card" aria-labelledby="reportHeading">
+      <h2 id="reportHeading">Report article/context issue</h2>
+      <label for="reportCategory">Problem category</label>
+      <select id="reportCategory">
+        <option value="publisher-not-detected">Publisher not detected</option>
+        <option value="wrong-publisher">Wrong publisher detected</option>
+        <option value="potential-confirmed">Potential match shown as confirmed</option>
+        <option value="confirmed-potential">Confirmed match shown as potential</option>
+        <option value="missing-integrity">Missing retraction or correction</option>
+        <option value="wrong-integrity">Wrong integrity status</option>
+        <option value="layout-scroll">Page layout or scrolling problem</option>
+        <option value="suggest-publisher">Suggest a publisher preset</option>
+      </select>
+      <button id="reportIssue" class="secondary" type="button">Open sanitized GitHub report</button>
+    </section>
   </main>
+  <script src="shared/publisher_profiles.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
