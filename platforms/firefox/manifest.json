@@ -5,6 +5,8 @@
     "type": null,
     "scripts": [
       "shared/integrity.js",
+      "shared/publisher_profiles.js",
+      "publisher_background.js",
       "background.js"
     ]
   },
