@@ -35,6 +35,65 @@ test('legacy MDPI settings migrate without making MDPI mandatory', () => {
   assert.equal(api.normalizeSettings(settings).profiles.find(profile => profile.id === 'mdpi').enabled, false);
 });
 
+test('imports cannot rewrite or shadow built-in publisher identity evidence', () => {
+  const settings = api.normalizeSettings({
+    profiles: [
+      {
+        id: 'MDPI',
+        name: 'Impostor publisher',
+        source: 'custom',
+        domains: ['evil.example'],
+        doiPrefixes: ['10.9999'],
+        enabled: false,
+        action: 'hide',
+        color: '#123456',
+        potentialColor: '#654321',
+        confidencePolicy: 'include-potential'
+      },
+      {
+        id: 'frontiers',
+        name: 'Changed Frontiers',
+        source: 'builtin',
+        domains: ['example.com'],
+        doiPrefixes: ['10.9998'],
+        action: 'dim',
+        color: '#112233'
+      },
+      {
+        id: 'custom-mdpi',
+        name: 'Custom publisher',
+        source: 'custom',
+        domains: ['custom.example'],
+        doiPrefixes: [],
+        action: 'badge',
+        color: '#445566'
+      }
+    ]
+  });
+
+  const mdpi = settings.profiles.find(profile => profile.id === 'mdpi');
+  assert.equal(mdpi.name, 'MDPI');
+  assert.deepEqual(mdpi.domains, ['mdpi.com', 'mdpi.org']);
+  assert.deepEqual(mdpi.doiPrefixes, ['10.3390']);
+  assert.equal(mdpi.source, 'builtin');
+  assert.equal(mdpi.enabled, false);
+  assert.equal(mdpi.action, 'hide');
+  assert.equal(mdpi.color, '#123456');
+  assert.equal(mdpi.potentialColor, '#654321');
+  assert.equal(mdpi.confidencePolicy, 'include-potential');
+
+  const frontiers = settings.profiles.find(profile => profile.id === 'frontiers');
+  assert.equal(frontiers.name, 'Frontiers');
+  assert.deepEqual(frontiers.domains, ['frontiersin.org']);
+  assert.deepEqual(frontiers.doiPrefixes, ['10.3389']);
+  assert.equal(frontiers.source, 'builtin');
+  assert.equal(frontiers.action, 'dim');
+  assert.equal(frontiers.color, '#112233');
+
+  assert.equal(settings.profiles.filter(profile => profile.id === 'mdpi').length, 1);
+  assert.ok(settings.profiles.some(profile => profile.id === 'custom-mdpi' && profile.source === 'custom'));
+});
+
 test('Frontiers matches verified DOI prefixes and publisher domains', () => {
   const settings = api.createDefaultSettings();
   const doiMatches = api.matchProfiles(settings, { doi: '10.3389/fbioe.2025.123456' });
