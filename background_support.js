@@ -100,9 +100,25 @@
     chrome.tabs.sendMessage(tabId, { type: 'forceIntegrityRescan' }, () => void chrome.runtime.lastError);
   }
 
+  function restoreOrRescan(tabId) {
+    if (!Number.isInteger(tabId)) return Promise.resolve(false);
+    const restore = globalThis.NotandiaBackgroundPersistence?.restoreTab;
+    if (typeof restore !== 'function') {
+      requestIntegrityRescan(tabId);
+      return Promise.resolve(false);
+    }
+    return Promise.resolve(restore(tabId)).then(restored => {
+      if (!restored) requestIntegrityRescan(tabId);
+      return restored;
+    }).catch(() => {
+      requestIntegrityRescan(tabId);
+      return false;
+    });
+  }
+
   function restoreIntegrityScans() {
     if (!chrome.storage?.session) {
-      for (const tabId of fallbackRecoveryTabs) requestIntegrityRescan(tabId);
+      for (const tabId of fallbackRecoveryTabs) void restoreOrRescan(tabId);
       return;
     }
     chrome.storage.session.get(null, stored => {
@@ -110,7 +126,7 @@
       for (const key of Object.keys(stored || {})) {
         if (!key.startsWith(RECOVERY_KEY_PREFIX)) continue;
         const tabId = Number(key.slice(RECOVERY_KEY_PREFIX.length));
-        if (Number.isInteger(tabId)) requestIntegrityRescan(tabId);
+        if (Number.isInteger(tabId)) void restoreOrRescan(tabId);
       }
     });
   }
@@ -135,9 +151,8 @@
         return false;
       }
       rememberIntegrityTab(tabId);
-      requestIntegrityRescan(tabId);
-      sendResponse({ success: true });
-      return false;
+      void restoreOrRescan(tabId).then(restored => sendResponse({ success: true, restored }));
+      return true;
     }
 
     if (message.type === 'ncbiIdConversion') {
