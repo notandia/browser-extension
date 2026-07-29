@@ -5,7 +5,7 @@
 
   function markPendingCounts() {
     const coverage = document.getElementById('integrityCoverage')?.textContent || '';
-    if (!/Checking|Restoring|Loading/i.test(coverage)) return;
+    if (!/Checking|Restoring|Loading|Waiting/i.test(coverage)) return;
     for (const id of ['countRetracted', 'countConcern', 'countCorrected', 'countWithdrawn']) {
       const node = document.getElementById(id);
       if (node) node.textContent = '…';
