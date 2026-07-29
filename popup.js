@@ -1,34 +1,24 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
+  const api = globalThis.NotandiaPublisherProfiles;
+  if (!api) throw new Error('Publisher profile runtime failed to load');
   const $ = id => document.getElementById(id);
-  const radios = [...document.querySelectorAll('input[name="mode"]')];
   const el = {
-    save: $('save'), status: $('status'), report: $('reportIssue'), settings: $('settingsIcon'), panel: $('settingsPanel'),
-    potential: $('highlightPotentialMdpi'), color: $('potentialMdpiColor'), logging: $('loggingEnabled'), ncbi: $('ncbiApiEnabledPopup'), integrity: $('integrityLookupsEnabled'),
-    refs: $('referencesList'), refsPlaceholder: $('referencesPlaceholder'), refsCount: $('referencesCount'),
-    integrityList: $('integrityList'), integrityPlaceholder: $('integrityPlaceholder'), coverage: $('integrityCoverage'), rescan: $('rescanIntegrity')
+    settings: $('settingsIcon'), panel: $('settingsPanel'), quickProfiles: $('quickProfiles'), save: $('save'), status: $('status'),
+    integrity: $('integrityLookupsEnabled'), ncbi: $('ncbiApiEnabledPopup'), logging: $('loggingEnabled'), manage: $('managePublishers'),
+    article: $('articleContext'), articleSummary: $('articleContextSummary'), integrityCoverage: $('integrityCoverage'),
+    contextList: $('contextList'), referencesSummary: $('referencesSummary'), rescan: $('rescan'), report: $('reportIssue'), reportCategory: $('reportCategory')
   };
-  const countIds = {
-    retracted: 'countRetracted',
-    'expression-of-concern': 'countConcern',
-    corrected: 'countCorrected',
-    reinstated: 'countReinstated',
-    'duplicate-publication': 'countDuplicate',
-    withdrawn: 'countWithdrawn'
-  };
-  const fallbackStatuses = {
-    retracted: { label: 'Retracted', icon: '×', color: '#B42318' },
-    'expression-of-concern': { label: 'Expression of concern', icon: '!', color: '#B54708' },
-    corrected: { label: 'Corrected', icon: '✎', color: '#175CD3' },
-    reinstated: { label: 'Reinstated', icon: '↩', color: '#067647' },
-    'duplicate-publication': { label: 'Duplicate publication', icon: '≡', color: '#6941C6' },
-    withdrawn: { label: 'Withdrawn or removed', icon: '–', color: '#475467' }
-  };
+  const countIds = { retracted: 'countRetracted', 'expression-of-concern': 'countConcern', corrected: 'countCorrected', withdrawn: 'countWithdrawn' };
+  let watchlist = api.defaultSettings();
+  let publisherReport = null;
+  let integrityReport = null;
+  let integrityStatuses = {};
 
-  function setStatus(message, timeout = 3500) {
+  function setStatus(message) {
     el.status.textContent = message;
-    if (timeout) setTimeout(() => { el.status.textContent = ''; }, timeout);
+    if (message) setTimeout(() => { if (el.status.textContent === message) el.status.textContent = ''; }, 3500);
   }
 
   function usesFirefoxDataConsent() {
@@ -42,122 +32,241 @@ document.addEventListener('DOMContentLoaded', () => {
     return Array.isArray(permissions.data_collection) && permissions.data_collection.includes('websiteContent');
   }
 
-  async function requestFirefoxDataConsent() {
+  async function setFirefoxDataConsent(enabled) {
     if (!usesFirefoxDataConsent()) return true;
-    return browser.permissions.request({ data_collection: ['websiteContent'] });
+    if (enabled) return browser.permissions.request({ data_collection: ['websiteContent'] });
+    await browser.permissions.remove({ data_collection: ['websiteContent'] });
+    return true;
   }
 
-  async function removeFirefoxDataConsent() {
-    if (!usesFirefoxDataConsent()) return true;
-    return browser.permissions.remove({ data_collection: ['websiteContent'] });
+  function chip(label, color, extraClass = '') {
+    const node = document.createElement('span');
+    node.className = `chip ${extraClass}`.trim();
+    node.textContent = label;
+    if (color) node.style.setProperty('--chip-color', color);
+    return node;
   }
 
-  function setCounts(counts = {}) {
-    for (const [status, id] of Object.entries(countIds)) {
-      const value = Number(counts[status]) || 0;
-      const node = $(id);
-      node.textContent = String(value);
-      const card = node.closest('.status-card');
-      card.classList.toggle('has-signal', value > 0);
-      card.setAttribute('aria-label', `${fallbackStatuses[status].label}: ${value}`);
+  function renderQuickProfiles() {
+    el.quickProfiles.replaceChildren();
+    for (const profile of watchlist.profiles) {
+      const row = document.createElement('div');
+      row.className = 'quick-profile';
+      row.dataset.profileId = profile.id;
+      const label = document.createElement('label');
+      const enabled = document.createElement('input');
+      enabled.type = 'checkbox';
+      enabled.className = 'quick-enabled';
+      enabled.checked = profile.enabled;
+      const name = document.createElement('strong');
+      name.textContent = profile.name;
+      label.append(enabled, name);
+      const action = document.createElement('select');
+      action.className = 'quick-action';
+      for (const value of api.ACTIONS) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = { none: 'Context', badge: 'Badge', highlight: 'Highlight', dim: 'Dim', hide: 'Hide' }[value];
+        option.selected = value === profile.action;
+        action.appendChild(option);
+      }
+      const color = document.createElement('input');
+      color.type = 'color';
+      color.className = 'quick-color';
+      color.value = profile.color;
+      color.title = `${profile.name} color`;
+      row.append(label, action, color);
+      el.quickProfiles.appendChild(row);
     }
   }
 
-  function clearIntegrityItems() {
-    el.integrityList.querySelectorAll('li:not(#integrityPlaceholder)').forEach(node => node.remove());
+  function readQuickProfiles() {
+    const byId = new Map(watchlist.profiles.map(profile => [profile.id, profile]));
+    for (const row of el.quickProfiles.querySelectorAll('.quick-profile')) {
+      const profile = byId.get(row.dataset.profileId);
+      if (!profile) continue;
+      profile.enabled = row.querySelector('.quick-enabled').checked;
+      profile.action = row.querySelector('.quick-action').value;
+      profile.color = row.querySelector('.quick-color').value;
+    }
+    watchlist = api.sanitizeSettings({ ...watchlist, profiles: Array.from(byId.values()) });
   }
 
-  function renderDisabled() {
-    setCounts();
-    clearIntegrityItems();
-    el.coverage.textContent = 'Integrity lookups are disabled.';
-    el.integrityPlaceholder.textContent = 'Enable lookups in settings to check DOI status metadata.';
-    el.integrityPlaceholder.style.display = 'block';
+  function renderArticleContext() {
+    el.article.replaceChildren();
+    const matches = publisherReport?.currentArticle?.matches || [];
+    const currentIntegrity = (integrityReport?.records || []).find(record => record.kind === 'current-article');
+    if (!matches.length && !currentIntegrity?.primaryStatus) {
+      const placeholder = document.createElement('p');
+      placeholder.className = 'placeholder';
+      placeholder.textContent = 'No enabled publisher profile or formal integrity signal was detected for the current article.';
+      el.article.appendChild(placeholder);
+      el.articleSummary.textContent = 'Current article has no enabled watchlist match.';
+      return;
+    }
+    const title = document.createElement('strong');
+    title.textContent = matches.length ? matches.map(match => match.profileName).join(', ') : 'Current article';
+    const doi = document.createElement('code');
+    doi.textContent = publisherReport?.currentArticle?.doi || currentIntegrity?.doi || '';
+    const chips = document.createElement('div');
+    chips.className = 'chip-row';
+    for (const match of matches) chips.appendChild(chip(`${match.profileName} · ${match.action}`, match.color));
+    for (const event of currentIntegrity?.events || []) chips.appendChild(chip(integrityStatuses[event.status]?.label || event.status, integrityStatuses[event.status]?.color || '#B42318', 'integrity'));
+    el.article.append(title);
+    if (doi.textContent) el.article.append(doi);
+    el.article.append(chips);
+    el.articleSummary.textContent = `${matches.length} publisher profile match${matches.length === 1 ? '' : 'es'}${currentIntegrity?.primaryStatus ? ' · formal update found' : ''}`;
   }
 
-  renderDisabled();
+  function setIntegrityCounts() {
+    const counts = integrityReport?.summary?.counts || {};
+    for (const [status, id] of Object.entries(countIds)) $(id).textContent = String(Number(counts[status]) || 0);
+    if (!el.integrity.checked) el.integrityCoverage.textContent = 'Integrity lookups are disabled.';
+    else if (!integrityReport) el.integrityCoverage.textContent = 'Waiting for identifiable DOI records…';
+    else if (integrityReport.state === 'loading') el.integrityCoverage.textContent = `Checking ${integrityReport.attempted || 0} DOI records…`;
+    else {
+      const summary = integrityReport.summary || {};
+      const parts = [`${summary.checked || 0} checked`];
+      if (summary.failed) parts.push(`${summary.failed} unresolved`);
+      if (integrityReport.notChecked) parts.push(`${integrityReport.notChecked} deferred`);
+      parts.push(integrityReport.provider || 'Crossref');
+      el.integrityCoverage.textContent = parts.join(' · ');
+    }
+  }
+
+  function recordKey(record) {
+    return record?.doi ? `doi:${record.doi.toLowerCase()}` : `id:${record?.id || ''}`;
+  }
+
+  function renderContextList() {
+    el.contextList.replaceChildren();
+    const merged = new Map();
+    for (const record of [...(publisherReport?.references || []), ...(publisherReport?.searchResults || [])]) {
+      merged.set(recordKey(record), { ...record, matches: record.matches || [], events: [] });
+    }
+    for (const record of integrityReport?.records || []) {
+      if (record.kind === 'current-article') continue;
+      const key = recordKey(record);
+      const existing = merged.get(key) || { id: record.id, kind: record.kind, number: record.number, doi: record.doi, text: record.text, matches: [] };
+      existing.events = record.events || [];
+      existing.primaryStatus = record.primaryStatus;
+      merged.set(key, existing);
+    }
+    const records = Array.from(merged.values()).filter(record => (record.matches || []).length || record.primaryStatus);
+    if (!records.length) {
+      const placeholder = document.createElement('li');
+      placeholder.className = 'placeholder';
+      placeholder.textContent = 'No enabled publisher matches or known formal integrity signals were found.';
+      el.contextList.appendChild(placeholder);
+      el.referencesSummary.textContent = 'No actionable context found.';
+      return;
+    }
+    records.sort((a, b) => (a.number || 9999) - (b.number || 9999));
+    for (const record of records) {
+      const item = document.createElement('li');
+      item.className = 'context-item';
+      if (record.id) {
+        item.dataset.refId = record.id;
+        item.tabIndex = 0;
+      }
+      const heading = document.createElement('div');
+      heading.className = 'context-item-heading';
+      const label = document.createElement('strong');
+      label.textContent = record.kind === 'search-result' ? `Search result ${record.number || ''}`.trim() : `Reference ${record.number || ''}`.trim();
+      const doi = document.createElement('code');
+      doi.textContent = record.doi || '';
+      heading.append(label, doi);
+      item.appendChild(heading);
+      if (record.text) {
+        const text = document.createElement('p');
+        text.textContent = record.text;
+        item.appendChild(text);
+      }
+      const chips = document.createElement('div');
+      chips.className = 'chip-row';
+      for (const match of record.matches || []) chips.appendChild(chip(`${match.profileName} · ${match.action}`, match.color));
+      for (const event of record.events || []) chips.appendChild(chip(integrityStatuses[event.status]?.label || event.status, integrityStatuses[event.status]?.color || '#B42318', 'integrity'));
+      item.appendChild(chips);
+      el.contextList.appendChild(item);
+    }
+    el.referencesSummary.textContent = `${records.length} item${records.length === 1 ? '' : 's'} with watchlist or formal integrity context.`;
+  }
+
+  function renderAll() {
+    renderArticleContext();
+    setIntegrityCounts();
+    renderContextList();
+  }
+
+  function loadReports() {
+    chrome.runtime.sendMessage({ type: 'getPublisherContext' }, response => {
+      if (!chrome.runtime.lastError) {
+        publisherReport = response?.report || null;
+        renderAll();
+      }
+    });
+    chrome.runtime.sendMessage({ type: 'getIntegrityReport' }, response => {
+      if (!chrome.runtime.lastError) {
+        integrityReport = response?.report || null;
+        integrityStatuses = response?.statuses || {};
+        renderAll();
+      }
+    });
+  }
+
+  function forceRescan() {
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+      if (!Number.isInteger(tabs[0]?.id)) return;
+      chrome.tabs.sendMessage(tabs[0].id, { type: 'forcePublisherRescan' }, () => void chrome.runtime.lastError);
+      chrome.tabs.sendMessage(tabs[0].id, { type: 'forceIntegrityRescan' }, () => void chrome.runtime.lastError);
+      setTimeout(loadReports, 500);
+      setTimeout(loadReports, 1600);
+    });
+  }
 
   el.settings.addEventListener('click', () => {
     const open = el.panel.classList.toggle('open');
     el.settings.setAttribute('aria-expanded', String(open));
   });
-  document.addEventListener('mousedown', event => {
-    if (el.panel.classList.contains('open') && !el.panel.contains(event.target) && !el.settings.contains(event.target)) {
-      el.panel.classList.remove('open');
-      el.settings.setAttribute('aria-expanded', 'false');
-    }
-  });
+  el.manage.addEventListener('click', () => chrome.runtime.openOptionsPage());
+  el.rescan.addEventListener('click', forceRescan);
 
-  chrome.storage.sync.get({
-    mode: 'highlight',
-    highlightPotentialMdpiSites: false,
-    potentialMdpiHighlightColor: '#FFFF99',
-    loggingEnabled: false,
-    ncbiApiEnabled: true,
-    integrityLookupsEnabled: false
-  }, settings => {
-    if (chrome.runtime.lastError) return setStatus('Error loading settings.');
-    radios.forEach(radio => { radio.checked = radio.value === settings.mode; });
-    el.potential.checked = Boolean(settings.highlightPotentialMdpiSites);
-    el.color.value = settings.potentialMdpiHighlightColor || '#FFFF99';
-    el.logging.checked = Boolean(settings.loggingEnabled);
-    el.ncbi.checked = settings.ncbiApiEnabled !== false;
-    void (async () => {
-      const permitted = await hasFirefoxDataConsent().catch(() => false);
-      el.integrity.checked = settings.integrityLookupsEnabled === true && permitted;
-      if (settings.integrityLookupsEnabled === true && !permitted) {
-        chrome.storage.sync.set({ integrityLookupsEnabled: false });
-      }
-      if (el.integrity.checked) loadIntegrity();
-      else renderDisabled();
-    })();
+  el.contextList.addEventListener('click', event => {
+    const item = event.target.closest('li[data-ref-id]');
+    if (!item) return;
+    chrome.runtime.sendMessage({ type: 'scrollToRef', refId: item.dataset.refId }, () => void chrome.runtime.lastError);
   });
-
-  function requestRescan() {
-    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-      if (!Number.isInteger(tabs[0]?.id)) return;
-      chrome.tabs.sendMessage(tabs[0].id, { type: 'forceIntegrityRescan' }, () => {
-        void chrome.runtime.lastError;
-        setTimeout(loadIntegrity, 300);
-      });
-    });
-  }
+  el.contextList.addEventListener('keydown', event => {
+    if (!['Enter', ' '].includes(event.key)) return;
+    const item = event.target.closest('li[data-ref-id]');
+    if (!item) return;
+    event.preventDefault();
+    chrome.runtime.sendMessage({ type: 'scrollToRef', refId: item.dataset.refId }, () => void chrome.runtime.lastError);
+  });
 
   el.save.addEventListener('click', () => {
     void (async () => {
-      if (!el.ncbi.checked && !confirm('Disabling NCBI lookups reduces MDPI detection accuracy. Continue?')) return;
-      if (el.integrity.checked) {
-        const granted = await requestFirefoxDataConsent().catch(() => false);
-        if (!granted) {
-          el.integrity.checked = false;
-          renderDisabled();
-          setStatus('Firefox data permission was not granted.');
-          return;
-        }
-      } else {
-        await removeFirefoxDataConsent().catch(() => false);
+      readQuickProfiles();
+      const consent = await setFirefoxDataConsent(el.integrity.checked).catch(() => false);
+      if (el.integrity.checked && !consent) {
+        el.integrity.checked = false;
+        return setStatus('Firefox data permission was not granted.');
       }
-
+      const mdpi = watchlist.profiles.find(profile => profile.id === 'mdpi');
       chrome.storage.sync.set({
-        mode: radios.find(radio => radio.checked)?.value || 'highlight',
-        highlightPotentialMdpiSites: el.potential.checked,
-        potentialMdpiHighlightColor: el.color.value || '#FFFF99',
-        loggingEnabled: el.logging.checked,
+        publisherWatchlist: watchlist,
+        integrityLookupsEnabled: el.integrity.checked,
         ncbiApiEnabled: el.ncbi.checked,
-        integrityLookupsEnabled: el.integrity.checked
+        loggingEnabled: el.logging.checked,
+        mode: mdpi?.action === 'hide' ? 'hide' : 'highlight',
+        highlightPotentialMdpiSites: mdpi?.confidencePolicy === 'confirmed-and-potential',
+        potentialMdpiHighlightColor: mdpi?.color || '#E2211C'
       }, () => {
-        if (chrome.runtime.lastError) return setStatus('Error saving settings.');
+        if (chrome.runtime.lastError) return setStatus('Could not save settings.');
         setStatus('Settings saved.');
-        if (el.integrity.checked) requestRescan();
-        else renderDisabled();
+        forceRescan();
       });
     })();
-  });
-
-  el.rescan.addEventListener('click', () => {
-    if (!el.integrity.checked) return setStatus('Enable integrity lookups in settings first.');
-    el.coverage.textContent = 'Rescanning article references…';
-    requestRescan();
   });
 
   el.report.addEventListener('click', () => {
@@ -167,159 +276,40 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!/^https?:$/.test(parsed.protocol)) throw new Error();
         const address = `${parsed.origin}${parsed.pathname}`;
         const manifest = chrome.runtime.getManifest();
-        const title = encodeURIComponent(`Detection issue on ${parsed.hostname}`);
-        const body = encodeURIComponent(`**Report a detection issue**\n\nBefore submitting, remove information you do not want public.\n\n**Webpage address (query and fragment omitted):**\n${address}\n\n**Problem:**\n[Missed, incorrect, or wrong integrity status]\n\n---\n- Extension: ${manifest.name}\n- Version: ${manifest.version}\n- Integrity lookups: ${el.integrity.checked ? 'enabled' : 'disabled'}\n- Browser: ${navigator.userAgent}`);
+        const enabledProfiles = watchlist.profiles.filter(profile => profile.enabled).map(profile => profile.id).join(', ') || 'none';
+        const category = el.reportCategory.value;
+        const title = encodeURIComponent(`[${category}] Context issue on ${parsed.hostname}`);
+        const body = encodeURIComponent(`**Notandia article/context report**\n\n**Category:** ${category}\n\n**Page address (query and fragment omitted):**\n${address}\n\n**What happened?**\n[Describe the incorrect or missing context. Add a DOI or citation only when useful and safe to share.]\n\n---\n- Extension version: ${manifest.version}\n- Enabled publisher profiles: ${enabledProfiles}\n- Integrity checks: ${el.integrity.checked ? 'enabled' : 'disabled'}\n- Browser: ${navigator.userAgent}`);
         chrome.tabs.create({ url: `https://github.com/notandia/browser-extension/issues/new?title=${title}&body=${body}` });
       } catch {
-        setStatus('Issue reports are available only for web pages.');
+        setStatus('Reports are available only for web pages.');
       }
     });
   });
-
-  function scrollToReference(refId) {
-    chrome.runtime.sendMessage({ type: 'scrollToRef', refId }, response => {
-      if (chrome.runtime.lastError || !response?.success) setStatus('Could not locate that reference.');
-    });
-  }
-
-  for (const list of [el.refs, el.integrityList]) {
-    list.addEventListener('click', event => {
-      const item = event.target.closest('li[data-ref-id]');
-      if (item) scrollToReference(item.dataset.refId);
-    });
-  }
-  el.integrityList.addEventListener('keydown', event => {
-    if (!['Enter', ' '].includes(event.key)) return;
-    const item = event.target.closest('li[data-ref-id]');
-    if (item) {
-      event.preventDefault();
-      scrollToReference(item.dataset.refId);
-    }
-  });
-
-  function renderReferences(references, loading = false, error = '') {
-    el.refs.querySelectorAll('li:not(#referencesPlaceholder)').forEach(node => node.remove());
-    if (loading || error || !references?.length) {
-      el.refsCount.textContent = loading ? 'Loading' : 'No';
-      el.refsPlaceholder.textContent = error || (loading ? 'Loading references…' : 'No MDPI references detected.');
-      el.refsPlaceholder.style.display = 'block';
-      return;
-    }
-    const unique = new Map();
-    for (const ref of references) if (ref?.id && ref?.text) unique.set((ref.doi || ref.text).toLowerCase(), ref);
-    el.refsCount.textContent = String(unique.size);
-    el.refsPlaceholder.style.display = 'none';
-    for (const ref of unique.values()) {
-      const item = document.createElement('li');
-      item.dataset.refId = ref.id;
-      const number = document.createElement('span');
-      number.className = 'ref-number';
-      number.textContent = ref.number ? `${ref.number}. ` : '';
-      const text = document.createElement('span');
-      text.className = 'ref-text';
-      text.textContent = ref.text;
-      item.append(number, text);
-      el.refs.appendChild(item);
-    }
-  }
-
-  function loadReferences(attempt = 0) {
-    if (!attempt) renderReferences([], true);
-    chrome.runtime.sendMessage({ type: 'getMdpiReferences' }, response => {
-      if (chrome.runtime.lastError) return renderReferences([], false, 'Error loading references.');
-      const references = Array.isArray(response?.references) ? response.references : [];
-      if (references.length || attempt >= 3) return renderReferences(references);
-      setTimeout(() => loadReferences(attempt + 1), 300);
-    });
-  }
-
-  function chip(event, statuses) {
-    const definition = statuses[event.status] || fallbackStatuses[event.status] || {};
-    const node = document.createElement('span');
-    node.className = 'signal-chip';
-    node.style.setProperty('--signal-color', definition.color || '#475467');
-    node.textContent = `${definition.icon || '•'} ${definition.label || event.status}`;
-    node.title = [
-      event.date && `Date: ${event.date.slice(0, 10)}`,
-      event.source && `Source: ${event.source}`,
-      event.noticeDoi && `Notice DOI: ${event.noticeDoi}`
-    ].filter(Boolean).join('\n');
-    return node;
-  }
-
-  function renderIntegrity(report, statuses = fallbackStatuses) {
-    clearIntegrityItems();
-    if (!report) {
-      setCounts();
-      el.coverage.textContent = 'Waiting for identifiable DOI references…';
-      el.integrityPlaceholder.textContent = 'No DOI-bearing article or references detected yet.';
-      el.integrityPlaceholder.style.display = 'block';
-      return;
-    }
-    setCounts(report.summary?.counts);
-    if (report.state === 'loading') {
-      el.coverage.textContent = `Checking ${report.attempted || 0} of ${report.totalDiscovered || 0} discovered DOIs…`;
-      el.integrityPlaceholder.textContent = 'Looking up post-publication updates…';
-      el.integrityPlaceholder.style.display = 'block';
-      return;
-    }
-    const summary = report.summary || {};
-    const coverage = [`${summary.checked || 0} checked`];
-    if (report.notChecked) coverage.push(`${report.notChecked} deferred by page limit`);
-    if (summary.failed) coverage.push(`${summary.failed} unresolved`);
-    coverage.push(report.provider || 'Crossref');
-    el.coverage.textContent = coverage.join(' · ');
-    const affected = (report.records || []).filter(record => record.primaryStatus);
-    if (!affected.length) {
-      el.integrityPlaceholder.textContent = 'No known integrity signals were found in checked records.';
-      el.integrityPlaceholder.style.display = 'block';
-      return;
-    }
-    el.integrityPlaceholder.style.display = 'none';
-    for (const record of affected) {
-      const item = document.createElement('li');
-      item.className = 'integrity-item';
-      if (record.kind === 'reference' && record.id) {
-        item.dataset.refId = record.id;
-        item.tabIndex = 0;
-      }
-      const heading = document.createElement('div');
-      heading.className = 'integrity-item-heading';
-      const label = document.createElement('strong');
-      label.textContent = record.kind === 'current-article' ? 'Current article' : `Reference ${record.number || ''}`.trim();
-      const doi = document.createElement('code');
-      doi.textContent = record.doi;
-      heading.append(label, doi);
-      item.appendChild(heading);
-      if (record.text && record.kind !== 'current-article') {
-        const paragraph = document.createElement('p');
-        paragraph.textContent = record.text;
-        item.appendChild(paragraph);
-      }
-      const chips = document.createElement('div');
-      chips.className = 'signal-chips';
-      for (const event of record.events || []) chips.appendChild(chip(event, statuses));
-      item.appendChild(chips);
-      el.integrityList.appendChild(item);
-    }
-  }
-
-  function loadIntegrity(attempt = 0) {
-    if (!el.integrity.checked) return renderDisabled();
-    chrome.runtime.sendMessage({ type: 'getIntegrityReport' }, response => {
-      if (chrome.runtime.lastError) {
-        el.coverage.textContent = 'Could not load integrity results.';
-        return;
-      }
-      renderIntegrity(response?.report || null, response?.statuses || fallbackStatuses);
-      if (response?.report?.state === 'loading' && attempt < 20) setTimeout(() => loadIntegrity(attempt + 1), 500);
-    });
-  }
 
   chrome.runtime.onMessage.addListener(message => {
-    if (message?.action === 'updateReferences' && Array.isArray(message.references)) renderReferences(message.references);
-    if (message?.type === 'integrityReportUpdated' && el.integrity.checked) loadIntegrity();
+    if (message?.type === 'integrityReportUpdated' || message?.type === 'publisherContextUpdated') loadReports();
   });
 
-  loadReferences();
+  chrome.storage.sync.get({
+    publisherWatchlist: null,
+    mode: 'highlight',
+    highlightPotentialMdpiSites: true,
+    potentialMdpiHighlightColor: '#E2211C',
+    integrityLookupsEnabled: false,
+    ncbiApiEnabled: true,
+    loggingEnabled: false
+  }, stored => {
+    watchlist = api.migrateLegacySettings(stored);
+    renderQuickProfiles();
+    el.ncbi.checked = stored.ncbiApiEnabled !== false;
+    el.logging.checked = stored.loggingEnabled === true;
+    void hasFirefoxDataConsent().then(permitted => {
+      el.integrity.checked = stored.integrityLookupsEnabled === true && permitted;
+      renderAll();
+    }).catch(() => { el.integrity.checked = false; });
+    if (!stored.publisherWatchlist || stored.publisherWatchlist.schemaVersion !== api.SCHEMA_VERSION) chrome.storage.sync.set({ publisherWatchlist: watchlist });
+    loadReports();
+    setTimeout(loadReports, 500);
+  });
 });
