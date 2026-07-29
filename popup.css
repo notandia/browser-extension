@@ -30,6 +30,10 @@ button.text-button{background:transparent;color:#2b5c88;padding:2px 4px}
 .chip{display:inline-flex;align-items:center;border:1px solid var(--chip-color,#48627a);color:var(--chip-color,#48627a);background:var(--chip-tint,#fff);border-radius:999px;padding:2px 7px;font-weight:650;font-size:11px}
 .chip.integrity{border-color:var(--chip-color,#b42318);color:var(--chip-color,#b42318)}
 .chip.integrity.primary-integrity{border-width:2px;padding:1px 6px}
+.integrity-progress{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;margin-top:8px}
+.integrity-progress[hidden]{display:none}
+.integrity-progress progress{width:100%;height:8px;accent-color:#175cd3}
+.integrity-progress span{color:var(--muted);font-size:10px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .status-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:9px}
 .status-card{border:1px solid var(--line);border-radius:8px;padding:6px;text-align:center;background:var(--paper)}
 .status-card strong{display:block;font-size:17px}
