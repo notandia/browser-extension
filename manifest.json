@@ -39,6 +39,7 @@
         "https://*/*"
       ],
       "js": [
+        "shared/publisher_profiles.js",
         "content/utils.js",
         "content/sanitizer.js",
         "content/domains.js",
@@ -59,6 +60,7 @@
         "content/reference_id_extractor.js",
         "content/ncbi_api_handler.js",
         "content/content_script.js",
+        "content/publisher_profile_scanner.js",
         "content/secure_message_handler.js",
         "content/integrity_scanner.js"
       ],
