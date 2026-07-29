@@ -36,7 +36,8 @@ test('Nature reference IDs generate selectors for citation anchors', () => {
 
 test('formal integrity presentation reuses the established inline selector generator', () => {
   const presentation = source('content/integrity_presentation.js');
-  assert.match(presentation, /generateInlineFootnoteSelectors\(record\.id\)/);
+  assert.match(presentation, /generateInlineFootnoteSelectors/);
+  assert.match(presentation, /const selectors = generator\(record\.id\)/);
   assert.match(presentation, /anchor\.classList\.add\('notandia-integrity-citation'\)/);
   assert.match(presentation, /reference\.classList\.add\('notandia-integrity-reference'\)/);
   assert.match(presentation, /chip\.textContent = `\$\{definition\.icon/);
