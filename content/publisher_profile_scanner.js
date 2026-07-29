@@ -161,10 +161,7 @@
 
   function restoreOriginalStyles(element) {
     const snapshot = originalStyles.get(element);
-    if (!snapshot) {
-      for (const property of STYLE_PROPERTIES) element.style.removeProperty(property);
-      return;
-    }
+    if (!snapshot) return;
     for (const [property, state] of Object.entries(snapshot)) {
       if (state.value) element.style.setProperty(property, state.value, state.priority);
       else element.style.removeProperty(property);
@@ -174,6 +171,11 @@
 
   function clearProfileStyle(element) {
     if (!element) return;
+    const hasManagedState = managedElements.has(element) ||
+      element.hasAttribute?.(STYLE_ATTRIBUTE) ||
+      element.hasAttribute?.(SIGNATURE_ATTRIBUTE) ||
+      Boolean(element.querySelector?.(':scope > .notandia-publisher-badges'));
+    if (!hasManagedState) return;
     restoreOriginalStyles(element);
     element.querySelectorAll?.(':scope > .notandia-publisher-badges').forEach(node => node.remove());
     element.removeAttribute(STYLE_ATTRIBUTE);
