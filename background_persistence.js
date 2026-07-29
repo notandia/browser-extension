@@ -4,8 +4,10 @@
   if (globalThis.NotandiaBackgroundPersistence) return;
 
   const STATE_PREFIX = 'notandia-session-tab-state-';
-  const STATE_VERSION = 1;
+  const STATE_VERSION = 2;
   const memoryState = new Map();
+  const restorePromises = new Map();
+  const saveTimers = new Map();
 
   function stateKey(tabId) {
     return `${STATE_PREFIX}${tabId}`;
@@ -64,24 +66,61 @@
     });
   }
 
-  async function restoreTab(tabId) {
-    if (!Number.isInteger(tabId)) return false;
-    const state = await readSession(tabId);
-    if (!validState(state)) return false;
+  function hasUsableState(tabId) {
+    return integrityTabData.get(tabId)?.state === 'ready' || publisherTabData.has(tabId);
+  }
 
-    if (state.integrity) integrityTabData.set(tabId, clone(state.integrity));
-    if (state.publisher) publisherTabData.set(tabId, clone(state.publisher));
-    if (Array.isArray(state.legacyReferences)) tabData.set(tabId, clone(state.legacyReferences));
-    if (state.legacyBadge) legacyBadgeData.set(tabId, clone(state.legacyBadge));
+  function restoreTab(tabId) {
+    if (!Number.isInteger(tabId)) return Promise.resolve(false);
+    if (restorePromises.has(tabId)) return restorePromises.get(tabId);
 
-    refreshBadge(tabId);
-    chrome.runtime.sendMessage({ type: 'integrityReportUpdated', tabId, restored: true }, () => void chrome.runtime.lastError);
-    chrome.runtime.sendMessage({ type: 'publisherContextUpdated', tabId, restored: true }, () => void chrome.runtime.lastError);
-    return Boolean(state.integrity || state.publisher);
+    const operation = (async () => {
+      const state = await readSession(tabId);
+      if (!validState(state)) return hasUsableState(tabId);
+
+      let restoredIntegrity = false;
+      let restoredPublisher = false;
+      let restoredLegacy = false;
+
+      // A loading snapshot has no active fetch after a worker restart. Do not
+      // revive it as a permanently loading report; the recovery path will rescan.
+      if (!integrityTabData.has(tabId) && state.integrity?.state === 'ready') {
+        integrityTabData.set(tabId, clone(state.integrity));
+        restoredIntegrity = true;
+      }
+      if (!publisherTabData.has(tabId) && state.publisher) {
+        publisherTabData.set(tabId, clone(state.publisher));
+        restoredPublisher = true;
+      }
+      if (!tabData.has(tabId) && Array.isArray(state.legacyReferences)) {
+        tabData.set(tabId, clone(state.legacyReferences));
+        restoredLegacy = state.legacyReferences.length > 0;
+      }
+      if (!legacyBadgeData.has(tabId) && state.legacyBadge) {
+        legacyBadgeData.set(tabId, clone(state.legacyBadge));
+        restoredLegacy = true;
+      }
+
+      if (restoredIntegrity || restoredPublisher || restoredLegacy) refreshBadge(tabId);
+      if (restoredIntegrity) {
+        chrome.runtime.sendMessage({ type: 'integrityReportUpdated', tabId, restored: true }, () => void chrome.runtime.lastError);
+      }
+      if (restoredPublisher) {
+        chrome.runtime.sendMessage({ type: 'publisherContextUpdated', tabId, restored: true }, () => void chrome.runtime.lastError);
+      }
+      return hasUsableState(tabId);
+    })().finally(() => restorePromises.delete(tabId));
+
+    restorePromises.set(tabId, operation);
+    return operation;
   }
 
   function clearTab(tabId) {
     if (!Number.isInteger(tabId)) return;
+    const timer = saveTimers.get(tabId);
+    if (timer) clearTimeout(timer);
+    saveTimers.delete(tabId);
+    restorePromises.delete(tabId);
     memoryState.delete(tabId);
     if (chrome.storage?.session) chrome.storage.session.remove(stateKey(tabId), () => void chrome.runtime.lastError);
   }
@@ -130,7 +169,13 @@
 
   function scheduleSave(tabId, delay = 0) {
     if (!Number.isInteger(tabId)) return;
-    setTimeout(() => void saveTab(tabId), delay);
+    const existing = saveTimers.get(tabId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      saveTimers.delete(tabId);
+      void saveTab(tabId);
+    }, delay);
+    saveTimers.set(tabId, timer);
   }
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -190,6 +235,6 @@
   chrome.tabs.onRemoved.addListener(clearTab);
   chrome.runtime.onStartup?.addListener(restoreAllTabs);
 
-  globalThis.NotandiaBackgroundPersistence = { saveTab, restoreTab, clearTab };
+  globalThis.NotandiaBackgroundPersistence = { saveTab, restoreTab, ensureTab: restoreTab, clearTab };
   restoreAllTabs();
 })();
