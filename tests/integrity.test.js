@@ -18,6 +18,10 @@ const {
   summarizeIntegrityRecords
 } = require('../shared/integrity.js');
 
+function source(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), 'utf8');
+}
+
 test('DOIs are normalized without accepting arbitrary URLs', () => {
   assert.equal(normalizeDOI(' https://doi.org/10.1000/ABC.123. '), '10.1000/abc.123');
   assert.equal(normalizeDOI('doi:10.3390/nu4091171'), '10.3390/nu4091171');
@@ -120,9 +124,10 @@ test('request-start limiter spaces concurrent callers', async () => {
 });
 
 test('integrity network behavior is explicit opt-in and cancellable', () => {
-  const scanner = fs.readFileSync(path.join(root, 'content', 'integrity_scanner.js'), 'utf8');
-  const popup = fs.readFileSync(path.join(root, 'popup.js'), 'utf8');
-  const background = fs.readFileSync(path.join(root, 'background.js'), 'utf8');
+  const scanner = source('content/integrity_scanner.js');
+  const popup = source('popup.js');
+  const background = source('background.js');
+  const support = source('background_support.js');
   assert.match(scanner, /integrityLookupsEnabled:\s*false/);
   assert.match(scanner, /integrityLookupsEnabled !== true/);
   assert.match(popup, /integrityLookupsEnabled:\s*false/);
@@ -131,18 +136,61 @@ test('integrity network behavior is explicit opt-in and cancellable', () => {
   assert.match(background, /controller\.abort\(\)/);
   assert.match(background, /hasIntegrityTransmissionConsent/);
   assert.match(background, /filter=updates:/);
+  assert.match(support, /credentials: 'omit'/);
+  assert.match(support, /referrerPolicy: 'no-referrer'/);
+  assert.match(support, /message\.type === 'ncbiIdConversion'/);
 });
 
-test('all browser targets load publisher and integrity runtimes safely', () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
-  const firefox = JSON.parse(fs.readFileSync(path.join(root, 'platforms', 'firefox', 'manifest.json'), 'utf8'));
-  const popup = fs.readFileSync(path.join(root, 'popup.js'), 'utf8');
-  assert.equal(manifest.background.service_worker, 'background.js');
+test('integrity runtime recovers service-worker state and presents affected references', () => {
+  const scanner = source('content/integrity_scanner.js');
+  const presentation = source('content/integrity_presentation.js');
+  const support = source('background_support.js');
+  const popupRecovery = source('popup_recovery.js');
+  const popupHtml = source('popup.html');
+
+  assert.match(scanner, /getAttribute\?\.\('data-counter'\)/);
+  assert.match(scanner, /referenceNumber\(element, index\)/);
+  assert.match(scanner, /references\.map\(reference => \[reference\.id, reference\.doi\]\)/);
+  assert.match(scanner, /sendResponse\(\{ scheduled: true \}\)/);
+
+  assert.match(presentation, /generateInlineFootnoteSelectors/);
+  assert.match(presentation, /notandia-integrity-reference/);
+  assert.match(presentation, /notandia-integrity-citation/);
+  assert.match(presentation, /notandia-integrity-chip/);
+  assert.match(presentation, /integrityPresentationNeedsRescan/);
+  assert.match(presentation, /MutationObserver/);
+
+  assert.match(support, /chrome\.storage\.session/);
+  assert.match(support, /restoreIntegrityScans/);
+  assert.match(support, /integrityPresentationNeedsRescan/);
+  assert.match(popupRecovery, /Restoring integrity results/);
+  assert.match(popupRecovery, /textContent = '…'/);
+  assert.match(popupHtml, /<script src="popup_recovery\.js"><\/script>/);
+});
+
+test('all browser targets load publisher, integrity, and recovery runtimes safely', () => {
+  const manifest = JSON.parse(source('manifest.json'));
+  const firefox = JSON.parse(source('platforms/firefox/manifest.json'));
+  const popup = source('popup.js');
+  const serviceWorker = source('service_worker.js');
+  const scripts = manifest.content_scripts[0].js;
+
+  assert.equal(manifest.background.service_worker, 'service_worker.js');
   assert.equal(Object.hasOwn(manifest.background, 'type'), false);
-  assert.ok(manifest.content_scripts[0].js.includes('shared/publisher_profiles.js'));
-  assert.ok(manifest.content_scripts[0].js.includes('content/publisher_profile_scanner.js'));
-  assert.ok(manifest.content_scripts[0].js.includes('content/integrity_scanner.js'));
-  assert.deepEqual(firefox.background.scripts.slice(0, 3), ['shared/publisher_profiles.js', 'shared/integrity.js', 'background.js']);
+  assert.ok(scripts.includes('shared/publisher_profiles.js'));
+  assert.ok(scripts.includes('content/publisher_profile_scanner.js'));
+  assert.ok(scripts.includes('content/integrity_scanner.js'));
+  assert.ok(scripts.includes('content/integrity_presentation.js'));
+  assert.ok(scripts.indexOf('content/ncbi_fetch_proxy.js') < scripts.indexOf('content/ncbi_api_handler.js'));
+  assert.ok(manifest.content_scripts[0].css.includes('content/integrity_presentation.css'));
+  assert.match(serviceWorker, /background_support\.js/);
+  assert.match(serviceWorker, /background\.js/);
+  assert.deepEqual(firefox.background.scripts, [
+    'shared/publisher_profiles.js',
+    'shared/integrity.js',
+    'background_support.js',
+    'background.js'
+  ]);
   assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '140.0');
   assert.equal(firefox.browser_specific_settings.gecko_android.strict_min_version, '142.0');
   assert.deepEqual(firefox.browser_specific_settings.gecko.data_collection_permissions.required, ['none']);
