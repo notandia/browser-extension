@@ -30,6 +30,7 @@ Enable integrity checks and verify:
 - a retracted-and-corrected work shows one red Retracted chip and one blue Corrected chip;
 - filters and severity sorting work;
 - the toolbar badge counts distinct contextual works, rather than suppressing publisher matches whenever formal signals exist;
+- on the second Nature page, three formal-signal works plus two Frontiers references produce a badge count of five when those sets do not overlap;
 - during integrity checking, the popup shows completed DOI records, attempted records, a percentage, and a progress bar.
 
 For an affected reference such as reference 144, verify:
