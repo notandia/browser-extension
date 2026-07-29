@@ -8,17 +8,26 @@ document.addEventListener('DOMContentLoaded', () => {
     settings: $('settingsIcon'), panel: $('settingsPanel'), quickProfiles: $('quickProfiles'), save: $('save'), status: $('status'),
     integrity: $('integrityLookupsEnabled'), ncbi: $('ncbiApiEnabledPopup'), logging: $('loggingEnabled'), manage: $('managePublishers'),
     article: $('articleContext'), articleSummary: $('articleContextSummary'), integrityCoverage: $('integrityCoverage'),
-    contextList: $('contextList'), referencesSummary: $('referencesSummary'), rescan: $('rescan'), report: $('reportIssue'), reportCategory: $('reportCategory')
+    contextList: $('contextList'), referencesSummary: $('referencesSummary'), contextFilter: $('contextFilter'), contextSort: $('contextSort'),
+    rescan: $('rescan'), report: $('reportIssue'), reportCategory: $('reportCategory')
   };
   const countIds = { retracted: 'countRetracted', 'expression-of-concern': 'countConcern', corrected: 'countCorrected', withdrawn: 'countWithdrawn' };
   let watchlist = api.defaultSettings();
   let publisherReport = null;
   let integrityReport = null;
   let integrityStatuses = {};
+  let restoreInFlight = false;
+  let reloadQueued = false;
 
   function setStatus(message) {
     el.status.textContent = message;
     if (message) setTimeout(() => { if (el.status.textContent === message) el.status.textContent = ''; }, 3500);
+  }
+
+  function rgba(hex, alpha) {
+    const match = /^#([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i.exec(String(hex || ''));
+    if (!match) return `rgba(72,98,122,${alpha})`;
+    return `rgba(${parseInt(match[1], 16)},${parseInt(match[2], 16)},${parseInt(match[3], 16)},${alpha})`;
   }
 
   function usesFirefoxDataConsent() {
@@ -43,8 +52,54 @@ document.addEventListener('DOMContentLoaded', () => {
     const node = document.createElement('span');
     node.className = `chip ${extraClass}`.trim();
     node.textContent = label;
-    if (color) node.style.setProperty('--chip-color', color);
+    if (color) {
+      node.style.setProperty('--chip-color', color);
+      node.style.setProperty('--chip-tint', rgba(color, 0.055));
+    }
     return node;
+  }
+
+  function statusDefinition(status) {
+    return integrityStatuses?.[status] || null;
+  }
+
+  function uniqueIntegrityEvents(events) {
+    const byStatus = new Map();
+    for (const event of Array.isArray(events) ? events : []) {
+      const status = String(event?.status || '');
+      if (!status) continue;
+      const existing = byStatus.get(status);
+      if (!existing || Number(event?.timestamp || 0) > Number(existing?.timestamp || 0)) byStatus.set(status, event);
+    }
+    return Array.from(byStatus.values()).sort((left, right) => {
+      const leftSeverity = Number(statusDefinition(left.status)?.severity || 0);
+      const rightSeverity = Number(statusDefinition(right.status)?.severity || 0);
+      return rightSeverity - leftSeverity || String(left.status).localeCompare(String(right.status));
+    });
+  }
+
+  function refreshContextFilterOptions() {
+    const previous = el.contextFilter.value || 'all';
+    const options = [
+      ['all', 'All context'],
+      ['integrity:any', 'Any formal signal'],
+      ['status:retracted', 'Retracted'],
+      ['status:expression-of-concern', 'Expression of concern'],
+      ['status:corrected', 'Corrected'],
+      ['status:withdrawn', 'Withdrawn'],
+      ['publisher:any', 'Any publisher match']
+    ];
+    for (const profile of watchlist.profiles.filter(profile => profile.enabled)) {
+      options.push([`profile:${profile.id}`, profile.name]);
+    }
+    el.contextFilter.replaceChildren();
+    for (const [value, label] of options) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      el.contextFilter.appendChild(option);
+    }
+    el.contextFilter.value = options.some(([value]) => value === previous) ? previous : 'all';
   }
 
   function renderQuickProfiles() {
@@ -78,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
       row.append(label, action, color);
       el.quickProfiles.appendChild(row);
     }
+    refreshContextFilterOptions();
   }
 
   function readQuickProfiles() {
@@ -90,6 +146,17 @@ document.addEventListener('DOMContentLoaded', () => {
       profile.color = row.querySelector('.quick-color').value;
     }
     watchlist = api.sanitizeSettings({ ...watchlist, profiles: Array.from(byId.values()) });
+    refreshContextFilterOptions();
+  }
+
+  function appendIntegrityChips(container, events, primaryStatus) {
+    for (const event of uniqueIntegrityEvents(events)) {
+      const definition = statusDefinition(event.status);
+      const label = definition?.label || event.status;
+      const color = definition?.color || '#B42318';
+      const extraClass = event.status === primaryStatus ? 'integrity primary-integrity' : 'integrity';
+      container.appendChild(chip(label, color, extraClass));
+    }
   }
 
   function renderArticleContext() {
@@ -111,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chips = document.createElement('div');
     chips.className = 'chip-row';
     for (const match of matches) chips.appendChild(chip(`${match.profileName} · ${match.action}`, match.color));
-    for (const event of currentIntegrity?.events || []) chips.appendChild(chip(integrityStatuses[event.status]?.label || event.status, integrityStatuses[event.status]?.color || '#B42318', 'integrity'));
+    appendIntegrityChips(chips, currentIntegrity?.events || [], currentIntegrity?.primaryStatus);
     el.article.append(title);
     if (doi.textContent) el.article.append(doi);
     el.article.append(chips);
@@ -138,6 +205,34 @@ document.addEventListener('DOMContentLoaded', () => {
     return record?.doi ? `doi:${record.doi.toLowerCase()}` : `id:${record?.id || ''}`;
   }
 
+  function recordMatchesFilter(record) {
+    const filter = el.contextFilter.value || 'all';
+    if (filter === 'all') return true;
+    if (filter === 'publisher:any') return (record.matches || []).length > 0;
+    if (filter === 'integrity:any') return Boolean(record.primaryStatus);
+    if (filter.startsWith('status:')) {
+      const status = filter.slice('status:'.length);
+      return record.primaryStatus === status || uniqueIntegrityEvents(record.events).some(event => event.status === status);
+    }
+    if (filter.startsWith('profile:')) {
+      const profileId = filter.slice('profile:'.length);
+      return (record.matches || []).some(match => match.profileId === profileId);
+    }
+    return true;
+  }
+
+  function recordSeverity(record) {
+    const statuses = uniqueIntegrityEvents(record.events).map(event => Number(statusDefinition(event.status)?.severity || 0));
+    if (record.primaryStatus) statuses.push(Number(statusDefinition(record.primaryStatus)?.severity || 0));
+    return Math.max(0, ...statuses);
+  }
+
+  function recordAccent(record) {
+    const definition = statusDefinition(record.primaryStatus);
+    if (definition?.color) return definition.color;
+    return api.resolveVisualMatch(record.matches || [])?.color || null;
+  }
+
   function renderContextList() {
     el.contextList.replaceChildren();
     const merged = new Map();
@@ -148,23 +243,43 @@ document.addEventListener('DOMContentLoaded', () => {
       if (record.kind === 'current-article') continue;
       const key = recordKey(record);
       const existing = merged.get(key) || { id: record.id, kind: record.kind, number: record.number, doi: record.doi, text: record.text, matches: [] };
-      existing.events = record.events || [];
+      existing.events = uniqueIntegrityEvents(record.events || []);
       existing.primaryStatus = record.primaryStatus;
       merged.set(key, existing);
     }
-    const records = Array.from(merged.values()).filter(record => (record.matches || []).length || record.primaryStatus);
+
+    const allRecords = Array.from(merged.values()).filter(record => (record.matches || []).length || record.primaryStatus);
+    refreshContextFilterOptions();
+    const records = allRecords.filter(recordMatchesFilter);
+    const sortMode = el.contextSort.value || 'reference';
+    records.sort((left, right) => {
+      if (sortMode === 'severity') {
+        const severityDifference = recordSeverity(right) - recordSeverity(left);
+        if (severityDifference) return severityDifference;
+      }
+      return (left.number || 9999) - (right.number || 9999);
+    });
+
     if (!records.length) {
       const placeholder = document.createElement('li');
       placeholder.className = 'placeholder';
-      placeholder.textContent = 'No enabled publisher matches or known formal integrity signals were found.';
+      placeholder.textContent = allRecords.length
+        ? 'No results match the selected filter.'
+        : 'No enabled publisher matches or known formal integrity signals were found.';
       el.contextList.appendChild(placeholder);
-      el.referencesSummary.textContent = 'No actionable context found.';
+      el.referencesSummary.textContent = allRecords.length ? `0 of ${allRecords.length} items shown.` : 'No actionable context found.';
       return;
     }
-    records.sort((a, b) => (a.number || 9999) - (b.number || 9999));
+
     for (const record of records) {
       const item = document.createElement('li');
       item.className = 'context-item';
+      const accent = recordAccent(record);
+      if (accent) {
+        item.classList.add('context-item-accented');
+        item.style.setProperty('--context-accent', accent);
+        item.style.setProperty('--context-tint', rgba(accent, 0.04));
+      }
       if (record.id) {
         item.dataset.refId = record.id;
         item.tabIndex = 0;
@@ -185,11 +300,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const chips = document.createElement('div');
       chips.className = 'chip-row';
       for (const match of record.matches || []) chips.appendChild(chip(`${match.profileName} · ${match.action}`, match.color));
-      for (const event of record.events || []) chips.appendChild(chip(integrityStatuses[event.status]?.label || event.status, integrityStatuses[event.status]?.color || '#B42318', 'integrity'));
+      appendIntegrityChips(chips, record.events || [], record.primaryStatus);
       item.appendChild(chips);
       el.contextList.appendChild(item);
     }
-    el.referencesSummary.textContent = `${records.length} item${records.length === 1 ? '' : 's'} with watchlist or formal integrity context.`;
+    el.referencesSummary.textContent = records.length === allRecords.length
+      ? `${records.length} item${records.length === 1 ? '' : 's'} with watchlist or formal integrity context.`
+      : `${records.length} of ${allRecords.length} items shown.`;
   }
 
   function renderAll() {
@@ -198,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderContextList();
   }
 
-  function loadReports() {
+  function fetchReports() {
     chrome.runtime.sendMessage({ type: 'getPublisherContext' }, response => {
       if (!chrome.runtime.lastError) {
         publisherReport = response?.report || null;
@@ -210,6 +327,23 @@ document.addEventListener('DOMContentLoaded', () => {
         integrityReport = response?.report || null;
         integrityStatuses = response?.statuses || {};
         renderAll();
+      }
+    });
+  }
+
+  function loadReports() {
+    if (restoreInFlight) {
+      reloadQueued = true;
+      return;
+    }
+    restoreInFlight = true;
+    chrome.runtime.sendMessage({ type: 'restorePersistedTabState' }, () => {
+      void chrome.runtime.lastError;
+      restoreInFlight = false;
+      fetchReports();
+      if (reloadQueued) {
+        reloadQueued = false;
+        setTimeout(loadReports, 25);
       }
     });
   }
@@ -230,6 +364,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   el.manage.addEventListener('click', () => chrome.runtime.openOptionsPage());
   el.rescan.addEventListener('click', forceRescan);
+  el.contextFilter.addEventListener('change', renderContextList);
+  el.contextSort.addEventListener('change', renderContextList);
 
   el.contextList.addEventListener('click', event => {
     const item = event.target.closest('li[data-ref-id]');
