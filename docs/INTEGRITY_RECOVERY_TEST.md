@@ -27,7 +27,7 @@ Enable integrity checks and verify:
 - visible bibliography numbers remain unchanged;
 - Frontiers and MDPI bibliography entries and inline citations use their configured profile colors;
 - formal integrity status colors override publisher colors for affected works;
-- a retracted-and-corrected work shows one red Retracted chip and one blue Corrected chip;
+- a retracted-and-corrected work shows one dark-red Retracted chip and one blue Corrected chip;
 - filters and severity sorting work;
 - the toolbar badge counts distinct contextual works, rather than suppressing publisher matches whenever formal signals exist;
 - on the second Nature page, three formal-signal works plus two Frontiers references produce a badge count of five when those sets do not overlap;
@@ -47,8 +47,8 @@ On an MDPI article whose bibliography items use `data-content="25."` or similar,
 
 - the popup uses the visible bibliography number, not the trailing digits of the DOM ID;
 - the MDPI badge is fully contained inside the highlighted reference entry;
-- the built-in MDPI profile remains red (`#E2211C`) unless changed by the user;
-- the publisher badge remains visibly distinct from formal integrity status chips.
+- the built-in MDPI profile remains its historical bright red (`#E2211C`) unless changed by the user;
+- the bright-red labeled publisher badge is not presented as a formal retraction; formal retractions use their own darker status red (`#B42318`) and explicit Retracted wording.
 
 ## Recovery
 
