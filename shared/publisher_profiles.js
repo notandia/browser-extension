@@ -40,6 +40,7 @@
       source: 'builtin'
     })
   ]);
+  const BUILTIN_PROFILE_IDS = new Set(BUILTIN_PROFILES.map(profile => profile.id));
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -126,6 +127,24 @@
     };
   }
 
+  function normalizeBuiltinProfile(profile, builtin) {
+    const supplied = profile && typeof profile === 'object' ? profile : {};
+    return normalizeProfile({
+      id: builtin.id,
+      name: builtin.name,
+      domains: builtin.domains,
+      doiPrefixes: builtin.doiPrefixes,
+      enabled: typeof supplied.enabled === 'boolean' ? supplied.enabled : builtin.enabled,
+      action: ACTIONS.includes(supplied.action) ? supplied.action : builtin.action,
+      color: SAFE_COLOR.test(String(supplied.color || '')) ? supplied.color : builtin.color,
+      potentialColor: SAFE_COLOR.test(String(supplied.potentialColor || '')) ? supplied.potentialColor : builtin.potentialColor,
+      confidencePolicy: CONFIDENCE_POLICIES.includes(supplied.confidencePolicy)
+        ? supplied.confidencePolicy
+        : builtin.confidencePolicy,
+      source: 'builtin'
+    }, builtin);
+  }
+
   function defaultProfiles() {
     return BUILTIN_PROFILES.map(profile => clone(profile));
   }
@@ -137,17 +156,27 @@
   function normalizeSettings(value) {
     const supplied = value && typeof value === 'object' ? value : {};
     const suppliedProfiles = Array.isArray(supplied.profiles) ? supplied.profiles : [];
+    const suppliedByCanonicalId = new Map();
     const normalizedById = new Map();
 
+    for (const profile of suppliedProfiles) {
+      const canonicalId = String(profile?.id || '').trim().toLowerCase();
+      if (!canonicalId || suppliedByCanonicalId.has(canonicalId)) continue;
+      suppliedByCanonicalId.set(canonicalId, profile);
+    }
+
     for (const builtin of BUILTIN_PROFILES) {
-      const override = suppliedProfiles.find(profile => profile?.id === builtin.id);
-      normalizedById.set(builtin.id, normalizeProfile(override || builtin, builtin));
+      const override = suppliedByCanonicalId.get(builtin.id);
+      normalizedById.set(builtin.id, normalizeBuiltinProfile(override, builtin));
     }
 
     for (const profile of suppliedProfiles) {
-      if (profile?.source === 'builtin' || normalizedById.has(profile?.id)) continue;
+      const canonicalId = String(profile?.id || '').trim().toLowerCase();
+      if (!canonicalId || BUILTIN_PROFILE_IDS.has(canonicalId) || profile?.source === 'builtin') continue;
       const normalized = normalizeProfile({ ...profile, source: 'custom' });
-      if (normalized && normalizedById.size < 52) normalizedById.set(normalized.id, normalized);
+      if (normalized && !normalizedById.has(normalized.id) && normalizedById.size < 52) {
+        normalizedById.set(normalized.id, normalized);
+      }
     }
 
     return {
