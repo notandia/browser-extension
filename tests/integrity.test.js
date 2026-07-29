@@ -12,6 +12,7 @@ const {
   createStartRateLimiter,
   derivePrimaryStatus,
   normalizeCrossrefEvents,
+  normalizeCrossrefUpdateRecords,
   normalizeDOI,
   normalizeUpdateType,
   summarizeIntegrityRecords
@@ -49,6 +50,31 @@ test('only updated-by relationships classify the queried work', () => {
   assert.equal(events[0].status, 'retracted');
   assert.equal(events[0].recordId, 42);
   assert.equal(events[0].noticeDoi, '10.1000/notice');
+});
+
+test('Crossref reverse update records classify the original Nature work', () => {
+  const events = normalizeCrossrefUpdateRecords([{
+    DOI: '10.1038/s41586-024-07653-0',
+    'update-to': [{
+      DOI: '10.1038/nature00870',
+      type: 'retraction',
+      source: 'retraction-watch',
+      'record-id': 123
+    }],
+    created: { 'date-time': '2024-07-01T00:00:00Z' }
+  }], '10.1038/nature00870');
+  assert.equal(events.length, 1);
+  assert.equal(events[0].status, 'retracted');
+  assert.equal(events[0].noticeDoi, '10.1038/s41586-024-07653-0');
+  assert.equal(events[0].recordId, 123);
+});
+
+test('Crossref reverse update records ignore unrelated targets', () => {
+  const events = normalizeCrossrefUpdateRecords([{
+    DOI: '10.1000/notice',
+    'update-to': [{ DOI: '10.1000/different-work', type: 'retraction' }]
+  }], '10.1000/original-work');
+  assert.deepEqual(events, []);
 });
 
 test('reinstatement supersedes an older retraction without deleting history', () => {
@@ -104,16 +130,19 @@ test('integrity network behavior is explicit opt-in and cancellable', () => {
   assert.match(background, /function cancelIntegrityScan/);
   assert.match(background, /controller\.abort\(\)/);
   assert.match(background, /hasIntegrityTransmissionConsent/);
+  assert.match(background, /filter=updates:/);
 });
 
-test('all browser targets load the integrity runtime safely', () => {
+test('all browser targets load publisher and integrity runtimes safely', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   const firefox = JSON.parse(fs.readFileSync(path.join(root, 'platforms', 'firefox', 'manifest.json'), 'utf8'));
   const popup = fs.readFileSync(path.join(root, 'popup.js'), 'utf8');
   assert.equal(manifest.background.service_worker, 'background.js');
   assert.equal(Object.hasOwn(manifest.background, 'type'), false);
+  assert.ok(manifest.content_scripts[0].js.includes('shared/publisher_profiles.js'));
+  assert.ok(manifest.content_scripts[0].js.includes('content/publisher_profile_scanner.js'));
   assert.ok(manifest.content_scripts[0].js.includes('content/integrity_scanner.js'));
-  assert.deepEqual(firefox.background.scripts.slice(0, 2), ['shared/integrity.js', 'background.js']);
+  assert.deepEqual(firefox.background.scripts.slice(0, 3), ['shared/publisher_profiles.js', 'shared/integrity.js', 'background.js']);
   assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '140.0');
   assert.equal(firefox.browser_specific_settings.gecko_android.strict_min_version, '142.0');
   assert.deepEqual(firefox.browser_specific_settings.gecko.data_collection_permissions.required, ['none']);
