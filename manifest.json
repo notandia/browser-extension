@@ -39,7 +39,8 @@
         "https://*/*"
       ],
       "css": [
-        "content/publisher_compatibility.css"
+        "content/publisher_compatibility.css",
+        "content/integrity_presentation.css"
       ],
       "js": [
         "shared/publisher_profiles.js",
@@ -62,10 +63,12 @@
         "content/cited_by_processor.js",
         "content/similar_articles_processor.js",
         "content/reference_id_extractor.js",
+        "content/ncbi_fetch_proxy.js",
         "content/ncbi_api_handler.js",
         "content/content_script.js",
         "content/secure_message_handler.js",
         "content/integrity_scanner.js",
+        "content/integrity_presentation.js",
         "content/publisher_scanner.js"
       ],
       "run_at": "document_idle"
