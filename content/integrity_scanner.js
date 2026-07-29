@@ -102,6 +102,15 @@
     return generated;
   }
 
+  function referenceNumber(element, index) {
+    const counter = String(element.getAttribute?.('data-counter') || '').match(/\d+/)?.[0];
+    const numericCounter = Number(counter);
+    if (Number.isFinite(numericCounter) && numericCounter > 0) return numericCounter;
+    const identifier = String(element.dataset?.mdpiFilterRefId || element.id || '');
+    const numericIdentifier = Number(identifier.match(/\d+(?!.*\d)/)?.[0]);
+    return Number.isFinite(numericIdentifier) && numericIdentifier > 0 ? numericIdentifier : index + 1;
+  }
+
   function scanDocument() {
     chrome.storage.sync.get({ integrityLookupsEnabled: false }, settings => {
       if (chrome.runtime.lastError) return;
@@ -120,14 +129,14 @@
         seenDois.add(doi);
         references.push({
           id: referenceIdentifier(element, index),
-          number: index + 1,
+          number: referenceNumber(element, index),
           doi,
           text: String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT_LENGTH)
         });
       }
 
       const pageDoi = extractCurrentArticleDoi();
-      const fingerprint = JSON.stringify([pageDoi, references.map(reference => reference.doi)]);
+      const fingerprint = JSON.stringify([pageDoi, references.map(reference => [reference.id, reference.doi])]);
       if (fingerprint === lastFingerprint) return;
       lastFingerprint = fingerprint;
       chrome.runtime.sendMessage({ type: 'integrityScan', data: { pageDoi, references } }, () => void chrome.runtime.lastError);
@@ -139,15 +148,16 @@
     scanTimer = setTimeout(scanDocument, delay);
   }
 
-  chrome.runtime.onMessage.addListener(message => {
-    if (message?.type === 'forceIntegrityRescan') {
-      lastFingerprint = '';
-      scheduleScan(0);
-    }
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id || message?.type !== 'forceIntegrityRescan') return false;
+    lastFingerprint = '';
+    scheduleScan(0);
+    sendResponse({ scheduled: true });
+    return false;
   });
 
-  chrome.storage.onChanged.addListener(changes => {
-    if (changes.integrityLookupsEnabled) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.integrityLookupsEnabled) {
       lastFingerprint = '';
       scheduleScan(0);
     }
