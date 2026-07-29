@@ -123,7 +123,13 @@
       report?.updatedAt || '',
       affected.map(record => [record.id, record.primaryStatus, record.doi])
     ]);
-    if (fingerprint === lastFingerprint && presentationIsCurrent(affected)) return;
+    if (fingerprint === lastFingerprint && presentationIsCurrent(affected)) {
+      for (const record of affected) {
+        const definition = statuses?.[record.primaryStatus] || FALLBACK_STATUSES[record.primaryStatus];
+        if (definition) styleInlineCitations(record, definition);
+      }
+      return;
+    }
     lastFingerprint = fingerprint;
     applyingPresentation = true;
     clearPresentation();
