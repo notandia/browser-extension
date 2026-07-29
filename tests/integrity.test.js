@@ -141,10 +141,11 @@ test('integrity network behavior is explicit opt-in and cancellable', () => {
   assert.match(support, /message\.type === 'ncbiIdConversion'/);
 });
 
-test('integrity runtime recovers service-worker state and presents affected references', () => {
+test('integrity runtime restores reports before falling back to a rescan', () => {
   const scanner = source('content/integrity_scanner.js');
   const presentation = source('content/integrity_presentation.js');
   const support = source('background_support.js');
+  const persistence = source('background_persistence.js');
   const popupRecovery = source('popup_recovery.js');
   const popupHtml = source('popup.html');
 
@@ -161,11 +162,34 @@ test('integrity runtime recovers service-worker state and presents affected refe
   assert.match(presentation, /MutationObserver/);
 
   assert.match(support, /chrome\.storage\.session/);
-  assert.match(support, /restoreIntegrityScans/);
-  assert.match(support, /integrityPresentationNeedsRescan/);
+  assert.match(support, /restoreOrRescan/);
+  assert.match(support, /NotandiaBackgroundPersistence\?\.restoreTab/);
+  assert.match(persistence, /integrityTabData\.get\(tabId\)/);
+  assert.match(persistence, /publisherTabData\.get\(tabId\)/);
+  assert.match(persistence, /chrome\.storage\.session\.set/);
+  assert.match(persistence, /restorePersistedTabState/);
+  assert.match(persistence, /background_persistence\.js|STATE_PREFIX/);
+  assert.match(popupRecovery, /restorePersistedTabState/);
   assert.match(popupRecovery, /Restoring integrity results/);
   assert.match(popupRecovery, /textContent = '…'/);
   assert.match(popupHtml, /<script src="popup_recovery\.js"><\/script>/);
+});
+
+test('reference navigation prefers canonical visible bibliography copies', () => {
+  const handler = source('content/secure_message_handler.js');
+  const css = source('content/integrity_presentation.css');
+  const persistence = source('background_persistence.js');
+
+  assert.match(handler, /li\.c-article-references__item/);
+  assert.match(handler, /c-reading-companion/);
+  assert.match(handler, /requestedDoi/);
+  assert.match(handler, /requestedText/);
+  assert.match(handler, /notandia-scroll-target/);
+  assert.match(handler, /scrollIntoView\(\{ behavior: 'smooth', block: 'center' \}\)/);
+  assert.match(css, /@keyframes notandia-scroll-pulse/);
+  assert.match(css, /--notandia-scroll-color/);
+  assert.match(persistence, /findContextRecord/);
+  assert.match(persistence, /type: 'scrollToRefOnPage'/);
 });
 
 test('all browser targets load publisher, integrity, and recovery runtimes safely', () => {
@@ -185,11 +209,13 @@ test('all browser targets load publisher, integrity, and recovery runtimes safel
   assert.ok(manifest.content_scripts[0].css.includes('content/integrity_presentation.css'));
   assert.match(serviceWorker, /background_support\.js/);
   assert.match(serviceWorker, /background\.js/);
+  assert.match(serviceWorker, /background_persistence\.js/);
   assert.deepEqual(firefox.background.scripts, [
     'shared/publisher_profiles.js',
     'shared/integrity.js',
     'background_support.js',
-    'background.js'
+    'background.js',
+    'background_persistence.js'
   ]);
   assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '140.0');
   assert.equal(firefox.browser_specific_settings.gecko_android.strict_min_version, '142.0');
