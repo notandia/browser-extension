@@ -17,6 +17,7 @@
   let pollTimer = null;
   let lastFingerprint = '';
   let lastRecoveryRequestAt = 0;
+  let applyingPresentation = false;
 
   function normalizeDoi(value) {
     if (typeof value !== 'string') return null;
@@ -68,7 +69,8 @@
   }
 
   function clearPresentation() {
-    for (const element of document.querySelectorAll('[data-notandia-integrity-status]')) {
+    for (const element of document.querySelectorAll('.notandia-integrity-reference[data-notandia-integrity-status]')) {
+      element.classList.remove('notandia-integrity-reference');
       element.removeAttribute('data-notandia-integrity-status');
       element.style.removeProperty('--notandia-integrity-color');
       element.style.removeProperty('--notandia-integrity-tint');
@@ -79,6 +81,17 @@
       anchor.removeAttribute('data-notandia-integrity-status');
       anchor.style.removeProperty('--notandia-integrity-color');
     }
+  }
+
+  function presentationIsCurrent(records) {
+    for (const record of records) {
+      const reference = findReferenceElement(record.id);
+      if (!reference) continue;
+      if (!reference.classList.contains('notandia-integrity-reference')) return false;
+      if (reference.getAttribute('data-notandia-integrity-status') !== record.primaryStatus) return false;
+      if (!reference.querySelector(`.notandia-integrity-chip[data-notandia-integrity-chip="${record.id}"]`)) return false;
+    }
+    return true;
   }
 
   function styleInlineCitations(record, definition) {
@@ -109,8 +122,9 @@
       report?.updatedAt || '',
       affected.map(record => [record.id, record.primaryStatus, record.doi])
     ]);
-    if (fingerprint === lastFingerprint) return;
+    if (fingerprint === lastFingerprint && presentationIsCurrent(affected)) return;
     lastFingerprint = fingerprint;
+    applyingPresentation = true;
     clearPresentation();
 
     for (const record of affected) {
@@ -118,6 +132,7 @@
       if (!definition) continue;
       const reference = findReferenceElement(record.id);
       if (reference) {
+        reference.classList.add('notandia-integrity-reference');
         reference.setAttribute('data-notandia-integrity-status', record.primaryStatus);
         reference.style.setProperty('--notandia-integrity-color', definition.color);
         reference.style.setProperty('--notandia-integrity-tint', rgba(definition.color, 0.08));
@@ -131,6 +146,7 @@
       }
       styleInlineCitations(record, definition);
     }
+    setTimeout(() => { applyingPresentation = false; }, 0);
   }
 
   function requestRecovery() {
@@ -174,6 +190,11 @@
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) schedule(0);
   });
+  const observer = new MutationObserver(() => {
+    if (!applyingPresentation) schedule(300);
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => schedule(0), { once: true });
   else schedule(0);
 })();
