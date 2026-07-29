@@ -41,12 +41,14 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(manifest.action.default_title, 'Notandia');
       assert.equal(manifest.homepage_url, 'https://mdpi-filter.pages.dev/');
       assert.deepEqual(manifest.permissions, ['storage']);
+      assert.ok(manifest.content_scripts[0].js.includes('shared/publisher_profiles.js'));
+      assert.ok(manifest.content_scripts[0].js.includes('content/publisher_profile_scanner.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/integrity_scanner.js'));
     }
 
     assert.equal(chrome.background.service_worker, 'background.js');
     assert.equal(edge.background.service_worker, 'background.js');
-    assert.deepEqual(firefox.background.scripts, ['shared/integrity.js', 'background.js']);
+    assert.deepEqual(firefox.background.scripts, ['shared/publisher_profiles.js', 'shared/integrity.js', 'background.js']);
     assert.equal(Object.hasOwn(firefox.background, 'service_worker'), false);
     assert.equal(Object.hasOwn(firefox.background, 'type'), false);
     assert.equal(firefox.browser_specific_settings.gecko.id, 'browser-extension@notandia.github.io');
@@ -55,7 +57,9 @@ test('one source tree generates isolated Notandia browser packages', () => {
 
     for (const target of ['chrome', 'edge', 'firefox', 'safari']) {
       assert.equal(fs.existsSync(path.join(DIST, target, 'background.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'publisher_profiles.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'integrity.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'publisher_profile_scanner.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_scanner.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'content_script.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'scripts')), false);
