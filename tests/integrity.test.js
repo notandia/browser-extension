@@ -192,6 +192,25 @@ test('reference navigation prefers canonical visible bibliography copies', () =>
   assert.match(persistence, /type: 'scrollToRefOnPage'/);
 });
 
+test('live progress, visible counters, and combined context badges are packaged', () => {
+  const counter = source('content/reference_counter_normalizer.js');
+  const live = source('background_live_context.js');
+  const popupProgress = source('popup_progress.js');
+  const popupHtml = source('popup.html');
+  const css = source('content/integrity_presentation.css');
+
+  assert.match(counter, /data-content/);
+  assert.match(counter, /data-counter/);
+  assert.match(live, /integrityProgressUpdated/);
+  assert.match(live, /progressPercent/);
+  assert.match(live, /publisher watchlist match/);
+  assert.match(live, /NotandiaBackgroundPersistence\?\.saveTab/);
+  assert.match(popupProgress, /of \$\{attempted\} DOI records/);
+  assert.match(popupHtml, /id="integrityProgress"/);
+  assert.match(popupHtml, /popup_progress\.js/);
+  assert.match(css, /all: initial !important/);
+});
+
 test('all browser targets load publisher, integrity, and recovery runtimes safely', () => {
   const manifest = JSON.parse(source('manifest.json'));
   const firefox = JSON.parse(source('platforms/firefox/manifest.json'));
@@ -202,20 +221,24 @@ test('all browser targets load publisher, integrity, and recovery runtimes safel
   assert.equal(manifest.background.service_worker, 'service_worker.js');
   assert.equal(Object.hasOwn(manifest.background, 'type'), false);
   assert.ok(scripts.includes('shared/publisher_profiles.js'));
+  assert.ok(scripts.includes('content/reference_counter_normalizer.js'));
   assert.ok(scripts.includes('content/publisher_profile_scanner.js'));
   assert.ok(scripts.includes('content/integrity_scanner.js'));
   assert.ok(scripts.includes('content/integrity_presentation.js'));
+  assert.ok(scripts.indexOf('content/reference_counter_normalizer.js') < scripts.indexOf('content/publisher_profile_scanner.js'));
   assert.ok(scripts.indexOf('content/ncbi_fetch_proxy.js') < scripts.indexOf('content/ncbi_api_handler.js'));
   assert.ok(manifest.content_scripts[0].css.includes('content/integrity_presentation.css'));
   assert.match(serviceWorker, /background_support\.js/);
   assert.match(serviceWorker, /background\.js/);
   assert.match(serviceWorker, /background_persistence\.js/);
+  assert.match(serviceWorker, /background_live_context\.js/);
   assert.deepEqual(firefox.background.scripts, [
     'shared/publisher_profiles.js',
     'shared/integrity.js',
     'background_support.js',
     'background.js',
-    'background_persistence.js'
+    'background_persistence.js',
+    'background_live_context.js'
   ]);
   assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '140.0');
   assert.equal(firefox.browser_specific_settings.gecko_android.strict_min_version, '142.0');
