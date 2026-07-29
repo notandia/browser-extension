@@ -12,7 +12,10 @@
   const MAX_SEARCH_RESULTS = 150;
   const MAX_TEXT = 500;
   const STYLE_ATTRIBUTE = 'data-notandia-profile-style';
+  const SIGNATURE_ATTRIBUTE = 'data-notandia-profile-signature';
+  const STYLE_PROPERTIES = Object.freeze(['display', 'opacity', 'border-left', 'padding-left', 'background-color']);
   const LEGACY_MDPI_SELECTOR = '.mdpi-highlighted-reference,.mdpi-potential-reference,.mdpi-hidden-reference,.mdpi-highlighted-google,.mdpi-potential-google,.mdpi-search-result-highlight,.mdpi-search-result-hidden';
+  const originalStyles = new WeakMap();
   let settings = api.defaultSettings();
   let scanTimer = null;
   let lastFingerprint = '';
@@ -45,7 +48,13 @@
     } catch {}
   }
 
-  function evidenceFromElement(element) {
+  function cleanElementText(element) {
+    const clone = element.cloneNode(true);
+    clone.querySelectorAll('.notandia-publisher-badges,.notandia-mdpi-profile-badge').forEach(node => node.remove());
+    return String(clone.textContent || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT);
+  }
+
+  function evidenceFromElement(element, cleanText) {
     const dois = new Set();
     const hostnames = new Set();
     for (const attribute of ['data-doi', 'data-article-doi', 'data-reference-doi']) {
@@ -58,7 +67,7 @@
       addDoi(dois, href);
       addDoi(dois, link.getAttribute('data-doi') || '');
     }
-    addDoi(dois, element.textContent || '');
+    addDoi(dois, cleanText);
     return { dois: Array.from(dois), hostnames: Array.from(hostnames) };
   }
 
@@ -110,32 +119,66 @@
     return `rgba(${parseInt(match[1], 16)},${parseInt(match[2], 16)},${parseInt(match[3], 16)},${alpha})`;
   }
 
+  function legacyTargets(element) {
+    const targets = [];
+    if (element.matches?.(LEGACY_MDPI_SELECTOR)) targets.push(element);
+    for (const target of element.querySelectorAll?.(LEGACY_MDPI_SELECTOR) || []) targets.push(target);
+    return targets;
+  }
+
   function legacyMdpiSignal(element) {
-    const target = element.matches?.(LEGACY_MDPI_SELECTOR) ? element : element.querySelector?.(LEGACY_MDPI_SELECTOR);
+    const target = legacyTargets(element)[0];
     if (!target) return null;
     const potential = target.classList.contains('mdpi-potential-reference') || target.classList.contains('mdpi-potential-google');
     return potential ? 'potential' : 'confirmed';
   }
 
   function clearLegacyMdpiPresentation(element) {
-    const targets = [element, ...(element.querySelectorAll?.(LEGACY_MDPI_SELECTOR) || [])];
-    for (const target of targets) {
-      target.classList?.remove(
+    for (const target of legacyTargets(element)) {
+      target.classList.remove(
         'mdpi-highlighted-reference', 'mdpi-potential-reference', 'mdpi-hidden-reference',
         'mdpi-highlighted-google', 'mdpi-potential-google', 'mdpi-search-result-highlight', 'mdpi-search-result-hidden'
       );
       for (const property of ['display', 'opacity', 'border', 'border-left', 'padding', 'padding-left', 'background-color', 'outline', 'box-shadow']) {
-        target.style?.removeProperty(property);
+        target.style.removeProperty(property);
       }
     }
     element.querySelectorAll?.(':scope > .notandia-mdpi-profile-badge').forEach(node => node.remove());
   }
 
+  function rememberOriginalStyles(element) {
+    if (originalStyles.has(element)) return;
+    const snapshot = {};
+    for (const property of STYLE_PROPERTIES) {
+      snapshot[property] = {
+        value: element.style.getPropertyValue(property),
+        priority: element.style.getPropertyPriority(property)
+      };
+    }
+    originalStyles.set(element, snapshot);
+  }
+
+  function restoreOriginalStyles(element) {
+    const snapshot = originalStyles.get(element);
+    if (!snapshot) {
+      for (const property of STYLE_PROPERTIES) element.style.removeProperty(property);
+      return;
+    }
+    for (const [property, state] of Object.entries(snapshot)) {
+      if (state.value) element.style.setProperty(property, state.value, state.priority);
+      else element.style.removeProperty(property);
+    }
+    originalStyles.delete(element);
+  }
+
   function clearProfileStyle(element) {
-    if (!element?.hasAttribute?.(STYLE_ATTRIBUTE)) return;
-    for (const property of ['display', 'opacity', 'border', 'border-left', 'padding-left', 'background-color']) element.style.removeProperty(property);
-    element.querySelectorAll?.(':scope > .notandia-publisher-badges').forEach(node => node.remove());
+    const hasStyle = element?.hasAttribute?.(STYLE_ATTRIBUTE) || element?.hasAttribute?.(SIGNATURE_ATTRIBUTE);
+    const badges = element?.querySelectorAll?.(':scope > .notandia-publisher-badges') || [];
+    if (!hasStyle && badges.length === 0) return;
+    restoreOriginalStyles(element);
+    badges.forEach(node => node.remove());
     element.removeAttribute(STYLE_ATTRIBUTE);
+    element.removeAttribute(SIGNATURE_ATTRIBUTE);
   }
 
   function addBadges(element, matches) {
@@ -155,13 +198,34 @@
     element.prepend(container);
   }
 
+  function styleSignature(matches) {
+    return matches
+      .map(match => [match.profileId, match.confidence, match.action, match.color, ...(match.reasons || [])].join(':'))
+      .sort()
+      .join('|');
+  }
+
   function applyStyle(element, matches) {
+    const signature = styleSignature(matches);
+    const currentSignature = element.getAttribute(SIGNATURE_ATTRIBUTE) || '';
+    const hasLegacy = legacyTargets(element).length > 0 || Boolean(element.querySelector?.(':scope > .notandia-mdpi-profile-badge'));
+    const hasBadges = Boolean(element.querySelector?.(':scope > .notandia-publisher-badges'));
+    const needsBadges = matches.some(match => match.action !== 'none');
+
+    if (currentSignature === signature && hasBadges === needsBadges) {
+      if (hasLegacy) clearLegacyMdpiPresentation(element);
+      return;
+    }
+
     clearProfileStyle(element);
-    clearLegacyMdpiPresentation(element);
+    if (hasLegacy) clearLegacyMdpiPresentation(element);
     if (!matches.length) return;
+
     const visual = api.resolveVisualMatch(matches);
     if (!visual) return;
+    rememberOriginalStyles(element);
     element.setAttribute(STYLE_ATTRIBUTE, visual.profileId);
+    element.setAttribute(SIGNATURE_ATTRIBUTE, signature);
     addBadges(element, matches);
     if (visual.action === 'hide') element.style.setProperty('display', 'none', 'important');
     else if (visual.action === 'dim') element.style.setProperty('opacity', '0.45', 'important');
@@ -183,7 +247,7 @@
     document.documentElement.appendChild(style);
   }
 
-  function matchesForElement(element, evidence, legacySignal) {
+  function matchesForElement(evidence, legacySignal) {
     const matches = api.matchProfiles(settings, evidence);
     const mdpi = api.profileMap(settings).get('mdpi');
     if (legacySignal && mdpi?.enabled && !matches.some(match => match.profileId === 'mdpi')) {
@@ -199,15 +263,16 @@
 
   function buildRecord(element, index, kind) {
     const legacySignal = legacyMdpiSignal(element);
-    const evidence = evidenceFromElement(element);
-    const matches = matchesForElement(element, evidence, legacySignal);
+    const text = cleanElementText(element);
+    const evidence = evidenceFromElement(element, text);
+    const matches = matchesForElement(evidence, legacySignal);
     applyStyle(element, matches);
     return {
       id: safeRecordId(element, index, kind),
       kind,
       number: index + 1,
       doi: evidence.dois[0] || null,
-      text: String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT),
+      text,
       matches
     };
   }
