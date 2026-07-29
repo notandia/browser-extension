@@ -31,3 +31,31 @@
   text-decoration-thickness: 2px !important;
   text-underline-offset: 2px !important;
 }
+
+@keyframes notandia-scroll-pulse {
+  0% {
+    outline-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+  18%, 72% {
+    outline-color: var(--notandia-scroll-color, #48627A);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--notandia-scroll-color, #48627A) 22%, transparent);
+  }
+  100% {
+    outline-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.notandia-scroll-target {
+  outline: 3px solid transparent !important;
+  outline-offset: 3px !important;
+  animation: notandia-scroll-pulse 1.7s ease-out 1 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notandia-scroll-target {
+    animation-duration: 0.01ms !important;
+    outline-color: var(--notandia-scroll-color, #48627A) !important;
+  }
+}
