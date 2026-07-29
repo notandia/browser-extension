@@ -5,5 +5,6 @@ importScripts(
   'shared/integrity.js',
   'background_support.js',
   'background.js',
-  'background_persistence.js'
+  'background_persistence.js',
+  'background_live_context.js'
 );
