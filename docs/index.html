@@ -6,15 +6,15 @@
   <title>Notandia browser extension</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f4f7f6; color: #25313c; line-height: 1.6; }
-    .container { max-width: 900px; margin: 2rem auto; padding: 2rem; background: #fff; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,.08); }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f4f7f6; color: #12263f; line-height: 1.6; }
+    .container { max-width: 900px; margin: 2rem auto; padding: 2rem; background: #fff; border-radius: 12px; box-shadow: 0 0 15px rgba(0,0,0,.08); }
     header, footer { text-align: center; }
-    header { border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem; }
+    header { border-bottom: 1px solid #d8e0e8; padding-bottom: 1rem; }
     nav { text-align: center; margin: 1.5rem 0; }
     nav a { margin: 0 .65rem; color: #175cd3; font-weight: 600; }
     h2 { margin-top: 2rem; border-bottom: 2px solid #d0d5dd; padding-bottom: .3rem; }
-    .notice { padding: 1rem; border-left: 4px solid #175cd3; background: #f5f8ff; }
-    .button { display: inline-block; padding: .65rem 1rem; border-radius: 5px; background: #175cd3; color: #fff; text-decoration: none; font-weight: 700; }
+    .notice { padding: 1rem; border-left: 4px solid #ffc857; background: #fff9e8; }
+    .button { display: inline-block; padding: .65rem 1rem; border-radius: 7px; background: #12263f; color: #fff; text-decoration: none; font-weight: 700; }
     footer { margin-top: 2rem; border-top: 1px solid #e5e7eb; padding-top: 1rem; color: #667085; }
   </style>
 </head>
@@ -22,7 +22,7 @@
   <div class="container">
     <header>
       <h1>Notandia</h1>
-      <p>Open-source context for scholarly literature.</p>
+      <p>Configurable publisher context and formal post-publication signals.</p>
     </header>
 
     <nav aria-label="Documentation navigation">
@@ -35,17 +35,21 @@
 
     <section id="about">
       <h2>About Notandia</h2>
-      <p><strong>Notandia</strong>, previously distributed as MDPI Filter, adds publisher context and explainable post-publication signals while you read scholarly literature.</p>
-      <p class="notice">Notandia is an independent open-source project. It is not affiliated with, authorized by, or endorsed by MDPI AG, Crossref, Retraction Watch, NCBI, browser vendors, or any publisher or data provider.</p>
+      <p><strong>Notandia</strong>, previously distributed as MDPI Filter, adds user-controlled publisher watchlists and explainable post-publication signals while you search for and read scholarly literature.</p>
+      <p class="notice"><strong>Interpretation:</strong> a publisher watchlist match identifies evidence selected in your settings. It is not a quality score or a claim that every article from that publisher is unreliable.</p>
+      <p>Notandia is an independent open-source project. It is not affiliated with, authorized by, or endorsed by MDPI AG, Frontiers Media SA, Crossref, Retraction Watch, NCBI, browser vendors, or any publisher or data provider.</p>
     </section>
 
     <section id="features">
       <h2>Features</h2>
       <ul>
-        <li>Highlights or hides MDPI results on supported scholarly-search pages.</li>
-        <li>Identifies MDPI references and related numerical citations where page structure permits.</li>
+        <li>Includes independently configurable MDPI and Frontiers profiles, enabled and highlighted by default.</li>
+        <li>Supports context-only, badge, highlight, dim, and hide behavior per publisher.</li>
+        <li>Allows validated custom publisher profiles using domains and DOI prefixes.</li>
+        <li>Integrates current-article, reference-list, and supported search-result publisher context.</li>
         <li>Optionally checks DOI metadata for formal retractions, concerns, corrections, reinstatements, withdrawals, and duplicate-publication findings.</li>
-        <li>Shows chronology, provenance, coverage, deferred checks, and unresolved identifiers without assigning a hidden quality score.</li>
+        <li>Checks both direct Crossref records and reverse update relationships for separately registered notices.</li>
+        <li>Shows provenance, coverage, deferred checks, and unresolved identifiers without assigning a hidden quality score.</li>
         <li>Keeps integrity lookups off by default and supports a zero-network configuration.</li>
       </ul>
     </section>
@@ -58,7 +62,7 @@
 
     <section id="support">
       <h2>Support</h2>
-      <p>Report detection problems and feature requests through the public issue tracker. Report vulnerabilities privately through GitHub Security Advisories.</p>
+      <p>Report publisher detection, integrity-status, layout, and feature issues through the public issue tracker. Report vulnerabilities privately through GitHub Security Advisories.</p>
       <p><a class="button" href="https://github.com/notandia/browser-extension/issues">Open the issue tracker</a></p>
     </section>
 
