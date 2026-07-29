@@ -2,54 +2,68 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Notandia Options</title>
-  <link rel="stylesheet" href="popup.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notandia Settings</title>
+  <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Notandia Options</h1>
-    <p>Select how MDPI results are handled on search sites:</p>
-    <label class="radio">
-      <input type="radio" name="mode" value="highlight">
-      <span>Highlight MDPI results</span>
-    </label>
-    <label class="radio">
-      <input type="radio" name="mode" value="hide">
-      <span>Hide MDPI results</span>
-    </label>
-    <hr class="separator">
-    <h2>Potential MDPI Site Highlighting (Google Search Only)</h2>
-    <div class="setting-item">
-      <label class="checkbox-label" for="highlightPotentialMdpiOptions">
-        <input type="checkbox" id="highlightPotentialMdpiOptions" name="highlightPotentialMdpiOptions">
-        <span>Highlight sites potentially linking to MDPI content</span>
-      </label>
-    </div>
-    <div class="setting-item">
-      <label for="potentialMdpiColorOptions" class="color-label">Highlight Color:</label>
-      <input type="color" id="potentialMdpiColorOptions" name="potentialMdpiColorOptions" class="color-picker-input">
-    </div>
-    <hr class="separator">
-    <div class="setting-item">
-      <label class="checkbox-label" for="loggingEnabledOptions">
-        <input type="checkbox" id="loggingEnabledOptions" name="loggingEnabledOptions">
-        <span>Enable Extension Logging</span>
-      </label>
-    </div>
-    <!-- Advanced Settings -->
-    <hr class="separator">
-    <p class="settings-title">Advanced Settings</p>
-    <div class="setting-item">
-      <label class="checkbox-label" for="ncbiApiEnabledOptions">
-        <input type="checkbox" id="ncbiApiEnabledOptions" name="ncbiApiEnabledOptions">
-        <span>Enable NCBI API lookups</span>
-        <span class="setting-warning">Disabling reduces accuracy, leading to missed or incorrect highlights.</span>
-      </label>
-    </div>
-    <button id="save">Save</button>
-    <div id="status"></div>
-  </div>
+  <main class="page">
+    <header class="page-header">
+      <img class="brand-icon" src="icons/icon-128.png" alt="">
+      <div>
+        <h1>Notandia settings</h1>
+        <p>Publisher context, personal watchlists, and formal research-integrity signals.</p>
+      </div>
+    </header>
 
+    <section class="card" aria-labelledby="publisherHeading">
+      <h2 id="publisherHeading">Publisher watchlist</h2>
+      <p class="explanation">Choose which publishers Notandia identifies and how matching articles, references, and search results are treated. MDPI and Frontiers are enabled and highlighted by default, but both can be disabled or changed independently.</p>
+      <p class="notice"><strong>Important:</strong> a watchlist match identifies a publisher selected in your settings. It is not a reliability score and does not claim that every article from that publisher is low quality.</p>
+      <div id="profileList" class="profile-list" aria-live="polite"></div>
+
+      <h3>Add custom publisher</h3>
+      <div class="custom-grid">
+        <label>Name<input id="customName" type="text" maxlength="80" placeholder="Publisher name"></label>
+        <label>Domains<input id="customDomains" type="text" placeholder="example.org, journals.example.org"></label>
+        <label>DOI prefixes<input id="customDoiPrefixes" type="text" placeholder="10.1234, 10.5678/journal"></label>
+        <label>Action<select id="customAction"><option value="highlight">Highlight</option><option value="badge">Badge only</option><option value="dim">Dim</option><option value="hide">Hide</option><option value="none">Context only</option></select></label>
+        <label>Color<input id="customColor" type="color" value="#48627A"></label>
+      </div>
+      <div class="button-row"><button id="addProfile" type="button">Add publisher</button></div>
+    </section>
+
+    <section class="card" aria-labelledby="integrityHeading">
+      <h2 id="integrityHeading">Research-integrity checks</h2>
+      <label class="setting-line" for="integrityLookupsEnabledOptions">
+        <input id="integrityLookupsEnabledOptions" type="checkbox">
+        <span>Check article and reference DOIs with Crossref<small>Only DOI identifiers are sent. Full pages, citation text, search queries, and browsing history are not sent to Notandia.</small></span>
+      </label>
+      <label class="setting-line" for="ncbiApiEnabledOptions">
+        <input id="ncbiApiEnabledOptions" type="checkbox">
+        <span>Enable NCBI metadata lookups<small>Improves MDPI detection when search results expose only PubMed or PMC identifiers.</small></span>
+      </label>
+      <label class="setting-line" for="loggingEnabledOptions">
+        <input id="loggingEnabledOptions" type="checkbox">
+        <span>Enable diagnostic logging<small>Useful only while troubleshooting detection problems.</small></span>
+      </label>
+    </section>
+
+    <section class="card" aria-labelledby="portabilityHeading">
+      <h2 id="portabilityHeading">Import or export profiles</h2>
+      <p class="explanation">Exported data contains publisher profile settings only. Imports are schema-validated and cannot contain scripts or executable selectors.</p>
+      <textarea id="profileJson" spellcheck="false" aria-label="Publisher profile JSON"></textarea>
+      <div class="button-row">
+        <button id="exportProfiles" type="button" class="secondary">Export</button>
+        <button id="importProfiles" type="button" class="secondary">Import</button>
+        <button id="resetProfiles" type="button" class="danger">Reset defaults</button>
+      </div>
+    </section>
+
+    <div class="button-row"><button id="save" type="button">Save all settings</button></div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+  </main>
+  <script src="shared/publisher_profiles.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
