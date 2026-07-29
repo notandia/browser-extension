@@ -1,0 +1,33 @@
+/* Formal integrity presentation is independent from publisher-watchlist styling. */
+.notandia-integrity-reference[data-notandia-integrity-status] {
+  box-sizing: border-box !important;
+  border-left: 4px solid var(--notandia-integrity-color, #B42318) !important;
+  padding-left: 8px !important;
+  background-color: var(--notandia-integrity-tint, rgba(180, 35, 24, 0.08)) !important;
+}
+
+.notandia-integrity-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin: 5px 0 !important;
+  padding: 2px 7px !important;
+  border: 1px solid var(--notandia-integrity-color, #B42318) !important;
+  border-radius: 999px !important;
+  color: var(--notandia-integrity-color, #B42318) !important;
+  background: #fff !important;
+  font: 700 11px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.notandia-integrity-citation,
+.notandia-integrity-citation * {
+  color: var(--notandia-integrity-color, #B42318) !important;
+  font-weight: 800 !important;
+  text-decoration-line: underline !important;
+  text-decoration-style: dotted !important;
+  text-decoration-color: var(--notandia-integrity-color, #B42318) !important;
+  text-decoration-thickness: 2px !important;
+  text-underline-offset: 2px !important;
+}
