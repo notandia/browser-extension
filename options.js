@@ -34,18 +34,14 @@ async function setFirefoxDataConsent(enabled) {
   return true;
 }
 
-function actionOptions(selected) {
-  return api.ACTIONS.map(action => {
-    const labels = { none: 'Context only', badge: 'Badge only', highlight: 'Highlight', dim: 'Dim', hide: 'Hide' };
-    return `<option value="${action}"${action === selected ? ' selected' : ''}>${labels[action]}</option>`;
-  }).join('');
-}
-
-function confidenceOptions(selected) {
-  return [
-    ['confirmed-only', 'Confirmed only'],
-    ['confirmed-and-potential', 'Include potential']
-  ].map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`).join('');
+function appendOptions(select, choices, selected) {
+  for (const [value, label] of choices) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    option.selected = value === selected;
+    select.appendChild(option);
+  }
 }
 
 function renderProfiles() {
@@ -81,7 +77,13 @@ function renderProfiles() {
     actionLabel.textContent = 'Action';
     const action = document.createElement('select');
     action.className = 'profile-action';
-    action.innerHTML = actionOptions(profile.action);
+    appendOptions(action, [
+      ['none', 'Context only'],
+      ['badge', 'Badge only'],
+      ['highlight', 'Highlight'],
+      ['dim', 'Dim'],
+      ['hide', 'Hide']
+    ], profile.action);
     actionLabel.appendChild(action);
 
     const colorLabel = document.createElement('label');
@@ -96,7 +98,10 @@ function renderProfiles() {
     confidenceLabel.textContent = 'Match policy';
     const confidence = document.createElement('select');
     confidence.className = 'profile-confidence';
-    confidence.innerHTML = confidenceOptions(profile.confidencePolicy);
+    appendOptions(confidence, [
+      ['confirmed-only', 'Confirmed only'],
+      ['confirmed-and-potential', 'Include potential']
+    ], profile.confidencePolicy);
     confidenceLabel.appendChild(confidence);
 
     const remove = document.createElement('button');
