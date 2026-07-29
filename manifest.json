@@ -14,7 +14,7 @@
     "extension_pages": "script-src 'self'; object-src 'self'; upgrade-insecure-requests;"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "service_worker.js"
   },
   "icons": {
     "16": "icons/icon-16.png",
@@ -38,6 +38,9 @@
       "matches": [
         "https://*/*"
       ],
+      "css": [
+        "content/integrity_presentation.css"
+      ],
       "js": [
         "shared/publisher_profiles.js",
         "content/utils.js",
@@ -58,11 +61,13 @@
         "content/cited_by_processor.js",
         "content/similar_articles_processor.js",
         "content/reference_id_extractor.js",
+        "content/ncbi_fetch_proxy.js",
         "content/ncbi_api_handler.js",
         "content/content_script.js",
         "content/publisher_profile_scanner.js",
         "content/secure_message_handler.js",
-        "content/integrity_scanner.js"
+        "content/integrity_scanner.js",
+        "content/integrity_presentation.js"
       ],
       "run_at": "document_idle"
     }
