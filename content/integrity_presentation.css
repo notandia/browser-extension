@@ -1,5 +1,5 @@
 /* Formal integrity presentation is independent from publisher-watchlist styling. */
-[data-notandia-integrity-status] {
+.notandia-integrity-reference[data-notandia-integrity-status] {
   box-sizing: border-box !important;
   border-left: 4px solid var(--notandia-integrity-color, #B42318) !important;
   padding-left: 8px !important;
