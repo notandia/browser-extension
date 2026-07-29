@@ -55,7 +55,8 @@ test('one source tree generates isolated Notandia browser packages', () => {
       'shared/publisher_profiles.js',
       'shared/integrity.js',
       'background_support.js',
-      'background.js'
+      'background.js',
+      'background_persistence.js'
     ]);
     assert.equal(Object.hasOwn(firefox.background, 'service_worker'), false);
     assert.equal(Object.hasOwn(firefox.background, 'type'), false);
@@ -66,6 +67,7 @@ test('one source tree generates isolated Notandia browser packages', () => {
     for (const target of ['chrome', 'edge', 'firefox', 'safari']) {
       assert.equal(fs.existsSync(path.join(DIST, target, 'background.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'background_support.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'background_persistence.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'service_worker.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'publisher_profiles.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'integrity.js')), true);
