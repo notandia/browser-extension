@@ -9,6 +9,9 @@
   const SAFE_ID = /^[A-Za-z0-9_.:-]{1,256}$/;
   const MAX_RECORDS = 500;
   const MAX_TEXT = 1000;
+  const NCBI_ENDPOINT = 'https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/';
+  const NCBI_MAX_IDS = 200;
+  const NCBI_TIMEOUT_MS = 10000;
 
   function usesFirefoxDataConsent() {
     const optional = chrome.runtime.getManifest().browser_specific_settings?.gecko?.data_collection_permissions?.optional;
@@ -93,6 +96,69 @@
     };
   }
 
+  function normalizeNcbiId(value, idType) {
+    let normalized = String(value || '').trim();
+    if (idType === 'pmid') return /^\d{1,12}$/.test(normalized) ? normalized : null;
+    if (idType === 'pmcid') {
+      normalized = normalized.toUpperCase();
+      return /^PMC\d{1,12}$/.test(normalized) ? normalized : null;
+    }
+    if (idType === 'doi') return api.normalizeDoi(normalized);
+    return null;
+  }
+
+  function sanitizeNcbiCandidate(candidate) {
+    if (!candidate || typeof candidate !== 'object') return null;
+    const output = {};
+    const pmid = normalizeNcbiId(candidate.pmid, 'pmid');
+    const pmcid = normalizeNcbiId(candidate.pmcid, 'pmcid');
+    const doi = normalizeNcbiId(candidate.doi, 'doi');
+    if (pmid) output.pmid = pmid;
+    if (pmcid) output.pmcid = pmcid;
+    if (doi) output.doi = doi;
+    return Object.keys(output).length ? output : null;
+  }
+
+  function sanitizeNcbiRecord(record) {
+    const output = sanitizeNcbiCandidate(record) || {};
+    const versions = Array.isArray(record?.versions)
+      ? record.versions.slice(0, 20).map(sanitizeNcbiCandidate).filter(Boolean)
+      : [];
+    if (versions.length) output.versions = versions;
+    return Object.keys(output).length ? output : null;
+  }
+
+  async function fetchNcbiRecords(ids, idType) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), NCBI_TIMEOUT_MS);
+    try {
+      const url = new URL(NCBI_ENDPOINT);
+      url.search = new URLSearchParams({
+        ids: ids.join(','),
+        idtype: idType,
+        format: 'json',
+        versions: 'no',
+        tool: 'notandia'
+      }).toString();
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`NCBI returned HTTP ${response.status}`);
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.toLowerCase().includes('application/json')) throw new Error('NCBI returned a non-JSON response');
+      const payload = await response.json();
+      return Array.isArray(payload?.records)
+        ? payload.records.slice(0, NCBI_MAX_IDS * 2).map(sanitizeNcbiRecord).filter(Boolean)
+        : [];
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   function badgeForTab(tabId) {
     const report = reportsByTab.get(tabId);
     const count = report?.summary?.matchedItems || 0;
@@ -138,6 +204,36 @@
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.id !== chrome.runtime.id || !message || typeof message !== 'object') return false;
+
+    if (message.type === 'ncbiIdConversion') {
+      const tabId = sender.tab?.id;
+      const idType = String(message.idType || '');
+      if (!Number.isInteger(tabId) || !['pmid', 'pmcid', 'doi'].includes(idType) || !Array.isArray(message.ids)) {
+        sendResponse({ success: false, records: [] });
+        return false;
+      }
+      const ids = Array.from(new Set(message.ids.map(value => normalizeNcbiId(value, idType)).filter(Boolean))).slice(0, NCBI_MAX_IDS);
+      if (!ids.length) {
+        sendResponse({ success: false, records: [] });
+        return false;
+      }
+      fetchNcbiRecords(ids, idType)
+        .then(records => sendResponse({ success: true, records }))
+        .catch(() => sendResponse({ success: false, records: [] }));
+      return true;
+    }
+
+    if (message.type === 'integrityPresentationNeedsRescan') {
+      const tabId = sender.tab?.id;
+      if (!Number.isInteger(tabId)) {
+        sendResponse({ success: false });
+        return false;
+      }
+      chrome.tabs.sendMessage(tabId, { type: 'forceIntegrityRescan' }, response => {
+        sendResponse({ success: !chrome.runtime.lastError && response !== false });
+      });
+      return true;
+    }
 
     if (message.type === 'publisherContextUpdate') {
       const tabId = sender.tab?.id;
