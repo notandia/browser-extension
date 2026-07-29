@@ -6,6 +6,7 @@ on:
       - feature/configurable-publisher-watchlists
     paths:
       - scripts/apply-publisher-watchlist-runtime.js
+      - .github/workflows/apply-publisher-watchlist-runtime.yml
 
 permissions:
   contents: write
