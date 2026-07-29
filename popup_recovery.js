@@ -12,13 +12,7 @@
     }
   }
 
-  function recoverMissingReport() {
-    const enabled = document.getElementById('integrityLookupsEnabled')?.checked === true;
-    const coverage = document.getElementById('integrityCoverage');
-    if (!enabled || recoveryRequested || !/Waiting for identifiable DOI records/i.test(coverage?.textContent || '')) return;
-    recoveryRequested = true;
-    coverage.textContent = 'Restoring integrity results…';
-    markPendingCounts();
+  function forceIntegrityRescan() {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
       const tabId = tabs[0]?.id;
       if (!Number.isInteger(tabId)) return;
@@ -26,15 +20,39 @@
     });
   }
 
+  function restoreSessionState({ allowRescan = false } = {}) {
+    if (recoveryRequested) return;
+    recoveryRequested = true;
+    chrome.runtime.sendMessage({ type: 'restorePersistedTabState' }, response => {
+      const restored = !chrome.runtime.lastError && response?.restored === true;
+      if (restored) return;
+      recoveryRequested = false;
+      if (allowRescan) forceIntegrityRescan();
+    });
+  }
+
+  function recoverMissingReport() {
+    const enabled = document.getElementById('integrityLookupsEnabled')?.checked === true;
+    const coverage = document.getElementById('integrityCoverage');
+    if (!enabled || recoveryRequested || !/Waiting for identifiable DOI records/i.test(coverage?.textContent || '')) return;
+    coverage.textContent = 'Restoring integrity results…';
+    markPendingCounts();
+    restoreSessionState({ allowRescan: true });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     const coverage = document.getElementById('integrityCoverage');
     if (coverage) {
       new MutationObserver(() => {
         markPendingCounts();
-        setTimeout(recoverMissingReport, 900);
+        setTimeout(recoverMissingReport, 700);
       }).observe(coverage, { childList: true, characterData: true, subtree: true });
     }
     markPendingCounts();
-    setTimeout(recoverMissingReport, 1400);
+    restoreSessionState();
+    setTimeout(() => {
+      recoveryRequested = false;
+      recoverMissingReport();
+    }, 900);
   }, { once: true });
 })();
