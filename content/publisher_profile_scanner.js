@@ -12,6 +12,7 @@
   const MAX_SEARCH_RESULTS = 150;
   const MAX_TEXT = 500;
   const STYLE_ATTRIBUTE = 'data-notandia-profile-style';
+  const LEGACY_MDPI_SELECTOR = '.mdpi-highlighted-reference,.mdpi-potential-reference,.mdpi-hidden-reference,.mdpi-highlighted-google,.mdpi-potential-google,.mdpi-search-result-highlight,.mdpi-search-result-hidden';
   let settings = api.defaultSettings();
   let scanTimer = null;
   let lastFingerprint = '';
@@ -64,25 +65,21 @@
   function currentArticleEvidence() {
     const dois = new Set();
     const hostnames = new Set([location.hostname.toLowerCase().replace(/^www\./, '')]);
-    const selectors = [
-      'meta[name="citation_doi"]',
-      'meta[name="dc.identifier"]',
-      'meta[name="DC.Identifier"]',
-      'meta[name="doi"]',
-      'meta[property="citation_doi"]'
-    ];
-    for (const selector of selectors) addDoi(dois, document.querySelector(selector)?.getAttribute('content') || '');
+    for (const selector of [
+      'meta[name="citation_doi"]', 'meta[name="dc.identifier"]', 'meta[name="DC.Identifier"]',
+      'meta[name="doi"]', 'meta[property="citation_doi"]'
+    ]) addDoi(dois, document.querySelector(selector)?.getAttribute('content') || '');
     addDoi(dois, document.querySelector('link[rel="canonical"]')?.getAttribute('href') || '');
     addDoi(dois, location.href);
     return { dois: Array.from(dois), hostnames: Array.from(hostnames) };
   }
 
-  function safeReferenceId(element, index) {
-    const existing = element.dataset?.mdpiFilterRefId || element.dataset?.notandiaRefId || element.id || element.getAttribute?.('data-bib-id');
+  function safeRecordId(element, index, kind) {
+    const existing = element.dataset?.mdpiFilterRefId || element.id || element.getAttribute?.('data-bib-id') || element.getAttribute?.('data-reference-id');
     const normalized = String(existing || '').trim();
     if (/^[A-Za-z0-9_.:-]{1,256}$/.test(normalized)) return normalized;
-    const generated = `notandia-ref-${index + 1}`;
-    element.dataset.notandiaRefId = generated;
+    const generated = `notandia-${kind}-${index + 1}`;
+    element.setAttribute('data-mdpi-filter-ref-id', generated);
     return generated;
   }
 
@@ -113,15 +110,31 @@
     return `rgba(${parseInt(match[1], 16)},${parseInt(match[2], 16)},${parseInt(match[3], 16)},${alpha})`;
   }
 
-  function clearStyle(element) {
+  function legacyMdpiSignal(element) {
+    const target = element.matches?.(LEGACY_MDPI_SELECTOR) ? element : element.querySelector?.(LEGACY_MDPI_SELECTOR);
+    if (!target) return null;
+    const potential = target.classList.contains('mdpi-potential-reference') || target.classList.contains('mdpi-potential-google');
+    return potential ? 'potential' : 'confirmed';
+  }
+
+  function clearLegacyMdpiPresentation(element) {
+    const targets = [element, ...(element.querySelectorAll?.(LEGACY_MDPI_SELECTOR) || [])];
+    for (const target of targets) {
+      target.classList?.remove(
+        'mdpi-highlighted-reference', 'mdpi-potential-reference', 'mdpi-hidden-reference',
+        'mdpi-highlighted-google', 'mdpi-potential-google', 'mdpi-search-result-highlight', 'mdpi-search-result-hidden'
+      );
+      for (const property of ['display', 'opacity', 'border', 'border-left', 'padding', 'padding-left', 'background-color', 'outline', 'box-shadow']) {
+        target.style?.removeProperty(property);
+      }
+    }
+    element.querySelectorAll?.(':scope > .notandia-mdpi-profile-badge').forEach(node => node.remove());
+  }
+
+  function clearProfileStyle(element) {
     if (!element?.hasAttribute?.(STYLE_ATTRIBUTE)) return;
-    element.style.removeProperty('display');
-    element.style.removeProperty('opacity');
-    element.style.removeProperty('border');
-    element.style.removeProperty('border-left');
-    element.style.removeProperty('padding-left');
-    element.style.removeProperty('background-color');
-    element.querySelectorAll(':scope > .notandia-publisher-badges').forEach(node => node.remove());
+    for (const property of ['display', 'opacity', 'border', 'border-left', 'padding-left', 'background-color']) element.style.removeProperty(property);
+    element.querySelectorAll?.(':scope > .notandia-publisher-badges').forEach(node => node.remove());
     element.removeAttribute(STYLE_ATTRIBUTE);
   }
 
@@ -142,14 +155,14 @@
     element.prepend(container);
   }
 
-  function applyStyle(element, matches, { includeMdpi = false } = {}) {
-    clearStyle(element);
-    const applicable = matches.filter(match => includeMdpi || match.profileId !== 'mdpi');
-    if (!applicable.length) return;
-    const visual = api.resolveVisualMatch(applicable);
+  function applyStyle(element, matches) {
+    clearProfileStyle(element);
+    clearLegacyMdpiPresentation(element);
+    if (!matches.length) return;
+    const visual = api.resolveVisualMatch(matches);
     if (!visual) return;
     element.setAttribute(STYLE_ATTRIBUTE, visual.profileId);
-    addBadges(element, applicable);
+    addBadges(element, matches);
     if (visual.action === 'hide') element.style.setProperty('display', 'none', 'important');
     else if (visual.action === 'dim') element.style.setProperty('opacity', '0.45', 'important');
     else if (visual.action === 'highlight') {
@@ -170,12 +183,27 @@
     document.documentElement.appendChild(style);
   }
 
-  function buildRecord(element, index, kind) {
-    const evidence = evidenceFromElement(element);
+  function matchesForElement(element, evidence, legacySignal) {
     const matches = api.matchProfiles(settings, evidence);
-    applyStyle(element, matches, { includeMdpi: false });
+    const mdpi = api.profileMap(settings).get('mdpi');
+    if (legacySignal && mdpi?.enabled && !matches.some(match => match.profileId === 'mdpi')) {
+      if (legacySignal === 'confirmed' || mdpi.confidencePolicy === 'confirmed-and-potential') {
+        matches.push({
+          profileId: 'mdpi', profileName: mdpi.name, confidence: legacySignal,
+          reasons: ['legacy-mdpi-detector'], action: mdpi.action, color: mdpi.color
+        });
+      }
+    }
+    return matches;
+  }
+
+  function buildRecord(element, index, kind) {
+    const legacySignal = legacyMdpiSignal(element);
+    const evidence = evidenceFromElement(element);
+    const matches = matchesForElement(element, evidence, legacySignal);
+    applyStyle(element, matches);
     return {
-      id: safeReferenceId(element, index),
+      id: safeRecordId(element, index, kind),
       kind,
       number: index + 1,
       doi: evidence.dois[0] || null,
@@ -184,27 +212,32 @@
     };
   }
 
+  function clearUnmanagedLegacyStyles(managed) {
+    for (const element of document.querySelectorAll(LEGACY_MDPI_SELECTOR)) {
+      const owner = managed.find(candidate => candidate === element || candidate.contains(element));
+      if (!owner) clearLegacyMdpiPresentation(element);
+    }
+  }
+
   function scan() {
     ensureStyleSheet();
+    const referenceElements = referenceNodes();
+    const searchElements = searchNodes();
+    const managed = Array.from(new Set([...referenceElements, ...searchElements]));
     const currentEvidence = currentArticleEvidence();
-    const currentArticle = {
-      doi: currentEvidence.dois[0] || null,
-      matches: api.matchProfiles(settings, currentEvidence)
-    };
-    const references = referenceNodes().map((element, index) => buildRecord(element, index, 'reference')).filter(record => record.matches.length);
-    const searchResults = searchNodes().map((element, index) => buildRecord(element, index, 'search-result')).filter(record => record.matches.length);
+    const currentArticle = { doi: currentEvidence.dois[0] || null, matches: api.matchProfiles(settings, currentEvidence) };
+    const references = referenceElements.map((element, index) => buildRecord(element, index, 'reference')).filter(record => record.matches.length);
+    const searchResults = searchElements.map((element, index) => buildRecord(element, index, 'search-result')).filter(record => record.matches.length);
+    clearUnmanagedLegacyStyles(managed);
     const fingerprint = JSON.stringify([
       settings,
       currentArticle,
-      references.map(record => [record.id, record.matches.map(match => match.profileId)]),
-      searchResults.map(record => [record.id, record.matches.map(match => match.profileId)])
+      references.map(record => [record.id, record.matches.map(match => [match.profileId, match.action, match.confidence])]),
+      searchResults.map(record => [record.id, record.matches.map(match => [match.profileId, match.action, match.confidence])])
     ]);
     if (fingerprint === lastFingerprint) return;
     lastFingerprint = fingerprint;
-    chrome.runtime.sendMessage({
-      type: 'publisherContextUpdate',
-      data: { currentArticle, references, searchResults }
-    }, () => void chrome.runtime.lastError);
+    chrome.runtime.sendMessage({ type: 'publisherContextUpdate', data: { currentArticle, references, searchResults } }, () => void chrome.runtime.lastError);
   }
 
   function scheduleScan(delay = 250) {
@@ -240,7 +273,7 @@
   });
 
   loadSettings();
-  const observer = new MutationObserver(() => scheduleScan(900));
+  const observer = new MutationObserver(() => scheduleScan(700));
   observer.observe(document.documentElement, { childList: true, subtree: true });
   setTimeout(() => scheduleScan(0), 1800);
 })();
