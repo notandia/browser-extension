@@ -7,6 +7,7 @@
   const MAX_REFERENCES = 250;
   const MAX_TEXT_LENGTH = 500;
   const DOI_PATTERN = /\b10\.\d{4,9}\/[A-Z0-9._;()/:+-]+/gi;
+  const OWN_NODE_SELECTOR = '.notandia-publisher-badges,.notandia-integrity-chip,#notandia-publisher-profile-styles';
   let scanTimer = null;
   let lastFingerprint = '';
 
@@ -75,18 +76,32 @@
     return doisFromValue(`${canonical} ${document.location.href}`)[0] || null;
   }
 
-  function referenceNodes() {
+  function configuredReferenceSelector() {
     const configured = window.MDPIFilterReferenceSelectors;
-    if (typeof configured === 'string' && configured.trim()) {
+    return typeof configured === 'string' && configured.trim() ? configured : '';
+  }
+
+  function referenceNodes() {
+    const configured = configuredReferenceSelector();
+    let nodes = [];
+    if (configured) {
       try {
-        return Array.from(document.querySelectorAll(configured));
+        nodes = Array.from(document.querySelectorAll(configured));
       } catch {
-        // Fall through to conservative generic selectors.
+        nodes = [];
       }
     }
-    return Array.from(document.querySelectorAll(
-      'ol.references > li, ul.references > li, .reference-list li, #references li, [role="doc-bibliography"] li'
-    ));
+    if (!nodes.length) {
+      nodes = Array.from(document.querySelectorAll(
+        'ol.references > li, ul.references > li, .reference-list li, #references li, [role="doc-bibliography"] li'
+      ));
+    }
+    nodes = nodes.filter(node => !nodes.some(other => other !== node && other.contains(node)));
+    const hasNatureMainBibliography = nodes.some(node => node.matches?.('li.c-article-references__item'));
+    if (hasNatureMainBibliography) {
+      nodes = nodes.filter(node => !node.closest?.('.c-reading-companion,.c-reading-companion__reference-item'));
+    }
+    return nodes.slice(0, MAX_REFERENCES);
   }
 
   function referenceIdentifier(element, index) {
@@ -121,7 +136,7 @@
 
       const references = [];
       const seenDois = new Set();
-      const nodes = referenceNodes().slice(0, MAX_REFERENCES);
+      const nodes = referenceNodes();
       for (let index = 0; index < nodes.length; index += 1) {
         const element = nodes[index];
         const doi = extractDoiFromElement(element);
@@ -143,9 +158,22 @@
     });
   }
 
-  function scheduleScan(delay = 400) {
+  function scheduleScan(delay = 300) {
     clearTimeout(scanTimer);
     scanTimer = setTimeout(scanDocument, delay);
+  }
+
+  function nodeTouchesIntegrityContext(node) {
+    if (!(node instanceof Element)) return false;
+    if (node.matches(OWN_NODE_SELECTOR) || node.closest(OWN_NODE_SELECTOR)) return false;
+    const selector = configuredReferenceSelector();
+    try {
+      if (selector && (node.matches(selector) || node.querySelector(selector))) return true;
+      if (node.matches('a[href*="doi.org"],a[href*="10."],[data-doi],[data-reference-doi]')) return true;
+      return Boolean(node.querySelector('a[href*="doi.org"],a[href*="10."],[data-doi],[data-reference-doi]'));
+    } catch {
+      return false;
+    }
   }
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -167,7 +195,15 @@
     document.addEventListener('DOMContentLoaded', () => scheduleScan(0), { once: true });
   } else scheduleScan(0);
 
-  const observer = new MutationObserver(() => scheduleScan(1200));
+  const observer = new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+      for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) {
+        if (nodeTouchesIntegrityContext(node)) {
+          scheduleScan(350);
+          return;
+        }
+      }
+    }
+  });
   observer.observe(document.documentElement, { childList: true, subtree: true });
-  setTimeout(() => scheduleScan(0), 2500);
 })();
