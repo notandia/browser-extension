@@ -33,6 +33,10 @@
 
     <section class="section" aria-labelledby="integrityHeading">
       <div class="section-heading-row"><div><h2 id="integrityHeading">Formal integrity signals</h2><p id="integrityCoverage" class="coverage-text">Integrity lookups are disabled.</p></div></div>
+      <div id="integrityProgressContainer" class="integrity-progress" hidden aria-live="polite">
+        <progress id="integrityProgress" max="100" value="0"></progress>
+        <span id="integrityProgressLabel">0 of 0 DOI records · 0%</span>
+      </div>
       <div id="integrityStatusGrid" class="status-grid" aria-label="Integrity signal counts">
         <div class="status-card status-retracted"><strong id="countRetracted">0</strong><span>Retracted</span></div>
         <div class="status-card status-concern"><strong id="countConcern">0</strong><span>Concern</span></div>
@@ -67,6 +71,7 @@
   </main>
   <script src="shared/publisher_profiles.js"></script>
   <script src="popup.js"></script>
+  <script src="popup_progress.js"></script>
   <script src="popup_recovery.js"></script>
 </body>
 </html>
