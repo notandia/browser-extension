@@ -6,6 +6,48 @@
   background-color: var(--notandia-integrity-tint, rgba(180, 35, 24, 0.08)) !important;
 }
 
+/* Host journal CSS sometimes positions the first reference span as a marker.
+   Reset those rules so the publisher badge remains inside the highlighted item. */
+html body .notandia-publisher-badges {
+  all: initial !important;
+  box-sizing: border-box !important;
+  position: static !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  margin: 4px 0 6px !important;
+  padding: 0 !important;
+  float: none !important;
+  transform: none !important;
+  font: 600 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  white-space: normal !important;
+  isolation: isolate !important;
+}
+
+html body .notandia-publisher-badge {
+  all: initial !important;
+  box-sizing: border-box !important;
+  position: static !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 2px 7px !important;
+  float: none !important;
+  transform: none !important;
+  border: 1px solid var(--notandia-profile-color, #48627A) !important;
+  border-radius: 999px !important;
+  color: var(--notandia-profile-color, #48627A) !important;
+  background: #fff !important;
+  font: 700 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap !important;
+  text-transform: none !important;
+}
+
 .notandia-integrity-chip {
   display: inline-flex !important;
   align-items: center !important;
