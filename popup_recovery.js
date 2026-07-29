@@ -20,11 +20,24 @@
     });
   }
 
+  function stillMissingIntegrityReport() {
+    const enabled = document.getElementById('integrityLookupsEnabled')?.checked === true;
+    const coverage = document.getElementById('integrityCoverage')?.textContent || '';
+    return enabled && /Waiting for identifiable DOI records|Restoring integrity results/i.test(coverage);
+  }
+
   function restoreSessionState({ allowRescan = false } = {}) {
     if (recoveryRequested) return;
     recoveryRequested = true;
     chrome.runtime.sendMessage({ type: 'restorePersistedTabState' }, response => {
       const restored = !chrome.runtime.lastError && response?.restored === true;
+      if (restored && allowRescan) {
+        setTimeout(() => {
+          recoveryRequested = false;
+          if (stillMissingIntegrityReport()) forceIntegrityRescan();
+        }, 450);
+        return;
+      }
       if (restored) return;
       recoveryRequested = false;
       if (allowRescan) forceIntegrityRescan();
