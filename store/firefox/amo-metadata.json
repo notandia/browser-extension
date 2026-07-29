@@ -1,6 +1,6 @@
 {
   "summary": {
-    "en-US": "Open-source publisher context and formal post-publication signals for scholarly literature."
+    "en-US": "Configurable publisher watchlists and formal post-publication signals for scholarly literature."
   },
   "categories": [
     "other"
@@ -10,6 +10,6 @@
   },
   "version": {
     "license": "AGPL-3.0-only",
-    "approval_notes": "Notandia was previously distributed as MDPI Filter. The legacy Gecko add-on ID is intentionally preserved so existing installations continue to receive updates. The submitted package is generated from the public repository without minification, bundling, remote code, or runtime npm dependencies. Research-integrity lookups are off by default. If the user explicitly enables them and grants Firefox's optional websiteContent data permission, only normalized DOI identifiers are sent to the Crossref REST API. Page URLs, page or citation text, cookies, account identifiers, and referrers are not sent. Requests are limited to no more than four starts per second and active requests are cancelled when lookups are disabled or navigation begins. Privacy policy: https://mdpi-filter.pages.dev/privacy/firefox/"
+    "approval_notes": "Notandia has not previously been released on Firefox. Its first release uses Gecko add-on ID browser-extension@notandia.github.io. The submitted package is generated from the public repository without minification, bundling, remote code, or runtime npm dependencies. Publisher watchlists are processed locally and can be independently enabled, disabled, highlighted, dimmed, hidden, or shown as context only. Custom profiles accept only validated domains and DOI prefixes; they cannot contain scripts or executable selectors. Research-integrity lookups are off by default. If the user explicitly enables them and grants Firefox's optional websiteContent data permission, only normalized DOI identifiers are sent to the Crossref REST API. Page URLs, page or citation text, publisher-profile settings, cookies, account identifiers, and referrers are not sent. Requests are limited to no more than four starts per second and active requests are cancelled when lookups are disabled or navigation begins. Privacy policy: https://mdpi-filter.pages.dev/privacy/firefox/"
   }
 }
