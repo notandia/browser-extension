@@ -42,6 +42,7 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(manifest.homepage_url, 'https://mdpi-filter.pages.dev/');
       assert.deepEqual(manifest.permissions, ['storage']);
       assert.ok(manifest.content_scripts[0].js.includes('shared/publisher_profiles.js'));
+      assert.ok(manifest.content_scripts[0].js.includes('content/reference_counter_normalizer.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/publisher_profile_scanner.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/integrity_scanner.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/integrity_presentation.js'));
@@ -56,7 +57,8 @@ test('one source tree generates isolated Notandia browser packages', () => {
       'shared/integrity.js',
       'background_support.js',
       'background.js',
-      'background_persistence.js'
+      'background_persistence.js',
+      'background_live_context.js'
     ]);
     assert.equal(Object.hasOwn(firefox.background, 'service_worker'), false);
     assert.equal(Object.hasOwn(firefox.background, 'type'), false);
@@ -68,9 +70,12 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(fs.existsSync(path.join(DIST, target, 'background.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'background_support.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'background_persistence.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'background_live_context.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'service_worker.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'popup_progress.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'publisher_profiles.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'integrity.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'reference_counter_normalizer.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'publisher_profile_scanner.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_scanner.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_presentation.js')), true);
