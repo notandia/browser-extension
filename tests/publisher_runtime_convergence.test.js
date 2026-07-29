@@ -30,3 +30,10 @@ test('publisher reports preserve stable bibliography numbers', () => {
   assert.match(scanner, /number: kind === 'reference' \? referenceNumber\(element, index\) : index \+ 1/);
   assert.match(scanner, /record\.number/);
 });
+
+test('publisher styling snapshots host-page styles before modification', () => {
+  const scanner = source('content/publisher_profile_scanner.js');
+  assert.match(scanner, /function rememberOriginalStyles\(/);
+  assert.match(scanner, /if \(!hasManagedState\) return;/);
+  assert.match(scanner, /rememberOriginalStyles\(element\);/);
+});
