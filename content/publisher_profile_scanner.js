@@ -205,28 +205,14 @@
       .join('|');
   }
 
-  function applyStyle(element, matches) {
-    const signature = styleSignature(matches);
-    const currentSignature = element.getAttribute(SIGNATURE_ATTRIBUTE) || '';
-    const hasLegacy = legacyTargets(element).length > 0 || Boolean(element.querySelector?.(':scope > .notandia-mdpi-profile-badge'));
-    const hasBadges = Boolean(element.querySelector?.(':scope > .notandia-publisher-badges'));
-    const needsBadges = matches.some(match => match.action !== 'none');
-
-    if (currentSignature === signature && hasBadges === needsBadges) {
-      if (hasLegacy) clearLegacyMdpiPresentation(element);
-      return;
+  function applyVisualProperties(element, visual) {
+    for (const property of STYLE_PROPERTIES) element.style.removeProperty(property);
+    const snapshot = originalStyles.get(element);
+    if (snapshot) {
+      for (const [property, state] of Object.entries(snapshot)) {
+        if (state.value) element.style.setProperty(property, state.value, state.priority);
+      }
     }
-
-    clearProfileStyle(element);
-    if (hasLegacy) clearLegacyMdpiPresentation(element);
-    if (!matches.length) return;
-
-    const visual = api.resolveVisualMatch(matches);
-    if (!visual) return;
-    rememberOriginalStyles(element);
-    element.setAttribute(STYLE_ATTRIBUTE, visual.profileId);
-    element.setAttribute(SIGNATURE_ATTRIBUTE, signature);
-    addBadges(element, matches);
     if (visual.action === 'hide') element.style.setProperty('display', 'none', 'important');
     else if (visual.action === 'dim') element.style.setProperty('opacity', '0.45', 'important');
     else if (visual.action === 'highlight') {
@@ -234,6 +220,33 @@
       element.style.setProperty('padding-left', '8px', 'important');
       element.style.setProperty('background-color', rgba(visual.color, 0.08), 'important');
     }
+  }
+
+  function applyStyle(element, matches) {
+    const signature = styleSignature(matches);
+    const currentSignature = element.getAttribute(SIGNATURE_ATTRIBUTE) || '';
+    const hasLegacy = legacyTargets(element).length > 0 || Boolean(element.querySelector?.(':scope > .notandia-mdpi-profile-badge'));
+    const hasBadges = Boolean(element.querySelector?.(':scope > .notandia-publisher-badges'));
+    const needsBadges = matches.some(match => match.action !== 'none');
+    const visual = api.resolveVisualMatch(matches);
+
+    if (currentSignature === signature && hasBadges === needsBadges) {
+      if (hasLegacy) {
+        clearLegacyMdpiPresentation(element);
+        if (visual) applyVisualProperties(element, visual);
+      }
+      return;
+    }
+
+    clearProfileStyle(element);
+    if (hasLegacy) clearLegacyMdpiPresentation(element);
+    if (!matches.length || !visual) return;
+
+    rememberOriginalStyles(element);
+    element.setAttribute(STYLE_ATTRIBUTE, visual.profileId);
+    element.setAttribute(SIGNATURE_ATTRIBUTE, signature);
+    addBadges(element, matches);
+    applyVisualProperties(element, visual);
   }
 
   function ensureStyleSheet() {
