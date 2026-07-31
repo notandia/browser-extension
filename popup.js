@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const el = {
     settings: $('settingsIcon'), panel: $('settingsPanel'), quickProfiles: $('quickProfiles'), save: $('save'), status: $('status'),
     integrity: $('integrityLookupsEnabled'), ncbi: $('ncbiApiEnabledPopup'), logging: $('loggingEnabled'), manage: $('managePublishers'),
-    article: $('articleContext'), articleSummary: $('articleContextSummary'), integrityCoverage: $('integrityCoverage'),
+    articleSection: $('articleContextSection'), article: $('articleContext'), articleSummary: $('articleContextSummary'), integrityCoverage: $('integrityCoverage'),
     contextList: $('contextList'), referencesSummary: $('referencesSummary'), contextFilter: $('contextFilter'), contextSort: $('contextSort'),
     rescan: $('rescan'), report: $('reportIssue'), reportCategory: $('reportCategory')
   };
@@ -28,6 +28,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const match = /^#([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i.exec(String(hex || ''));
     if (!match) return `rgba(72,98,122,${alpha})`;
     return `rgba(${parseInt(match[1], 16)},${parseInt(match[2], 16)},${parseInt(match[3], 16)},${alpha})`;
+  }
+
+  function escapeRegExp(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function cleanReferenceText(record) {
+    let text = String(record?.text || '').replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+
+    text = text
+      .replace(/https?:\/\/\S+/gi, ' ')
+      .replace(/\bPubMed Central\b/gi, ' ')
+      .replace(/\bGoogle Scholar\b/gi, ' ')
+      .replace(/\bPubMed\b/gi, ' ')
+      .replace(/\bCAS\b/g, ' ')
+      .replace(/\bArticle\b(?=\s*(?:$|[.,;]))/gi, ' ');
+
+    const doi = String(record?.doi || '').trim();
+    if (doi) {
+      const pattern = new RegExp(`(?:doi\\s*:\\s*)?(?:https?:\\/\\/(?:dx\\.)?doi\\.org\\/)?${escapeRegExp(doi)}`, 'ig');
+      text = text.replace(pattern, ' ');
+    }
+
+    text = text
+      .replace(/\s+([,.;:)])/g, '$1')
+      .replace(/([,.;:])(?:\s*\1)+/g, '$1')
+      .replace(/\.\s*\./g, '.')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/[\s,;:.-]+$/g, '')
+      .trim();
+
+    return text.slice(0, 420);
   }
 
   function usesFirefoxDataConsent() {
@@ -81,13 +114,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function refreshContextFilterOptions() {
     const previous = el.contextFilter.value || 'all';
     const options = [
-      ['all', 'All context'],
-      ['integrity:any', 'Any formal signal'],
+      ['all', 'All results'],
+      ['integrity:any', 'Formal updates'],
       ['status:retracted', 'Retracted'],
       ['status:expression-of-concern', 'Expression of concern'],
       ['status:corrected', 'Corrected'],
       ['status:withdrawn', 'Withdrawn'],
-      ['publisher:any', 'Any publisher match']
+      ['publisher:any', 'Publisher matches']
     ];
     for (const profile of watchlist.profiles.filter(profile => profile.enabled)) {
       options.push([`profile:${profile.id}`, profile.name]);
@@ -164,39 +197,49 @@ document.addEventListener('DOMContentLoaded', () => {
     const matches = publisherReport?.currentArticle?.matches || [];
     const currentIntegrity = (integrityReport?.records || []).find(record => record.kind === 'current-article');
     if (!matches.length && !currentIntegrity?.primaryStatus) {
-      const placeholder = document.createElement('p');
-      placeholder.className = 'placeholder';
-      placeholder.textContent = 'No enabled publisher profile or formal integrity signal was detected for the current article.';
-      el.article.appendChild(placeholder);
-      el.articleSummary.textContent = 'Current article has no enabled watchlist match.';
+      el.articleSection.hidden = true;
+      el.articleSummary.textContent = '';
       return;
     }
+
+    el.articleSection.hidden = false;
     const title = document.createElement('strong');
-    title.textContent = matches.length ? matches.map(match => match.profileName).join(', ') : 'Current article';
+    title.textContent = matches.length ? matches.map(match => match.profileName).join(', ') : 'Formal update found';
     const doi = document.createElement('code');
     doi.textContent = publisherReport?.currentArticle?.doi || currentIntegrity?.doi || '';
     const chips = document.createElement('div');
     chips.className = 'chip-row';
-    for (const match of matches) chips.appendChild(chip(`${match.profileName} · ${match.action}`, match.color));
+    for (const match of matches) chips.appendChild(chip(match.profileName, match.color));
     appendIntegrityChips(chips, currentIntegrity?.events || [], currentIntegrity?.primaryStatus);
     el.article.append(title);
     if (doi.textContent) el.article.append(doi);
     el.article.append(chips);
-    el.articleSummary.textContent = `${matches.length} publisher profile match${matches.length === 1 ? '' : 'es'}${currentIntegrity?.primaryStatus ? ' · formal update found' : ''}`;
+
+    const parts = [];
+    if (matches.length) parts.push(`${matches.length} publisher match${matches.length === 1 ? '' : 'es'}`);
+    if (currentIntegrity?.primaryStatus) parts.push('formal update');
+    el.articleSummary.textContent = parts.join(' · ');
   }
 
   function setIntegrityCounts() {
     const counts = integrityReport?.summary?.counts || {};
-    for (const [status, id] of Object.entries(countIds)) $(id).textContent = String(Number(counts[status]) || 0);
-    if (!el.integrity.checked) el.integrityCoverage.textContent = 'Integrity lookups are disabled.';
-    else if (!integrityReport) el.integrityCoverage.textContent = 'Waiting for identifiable DOI records…';
-    else if (integrityReport.state === 'loading') el.integrityCoverage.textContent = `Checking ${integrityReport.attempted || 0} DOI records…`;
+    for (const [status, id] of Object.entries(countIds)) {
+      const count = Number(counts[status]) || 0;
+      const node = $(id);
+      node.textContent = String(count);
+      const card = node.closest('[data-context-filter]');
+      const active = card?.dataset.contextFilter === el.contextFilter.value;
+      if (card) card.hidden = count === 0 && !active;
+    }
+
+    if (!el.integrity.checked) el.integrityCoverage.textContent = 'Formal checks off';
+    else if (!integrityReport) el.integrityCoverage.textContent = 'Waiting for DOI records';
+    else if (integrityReport.state === 'loading') el.integrityCoverage.textContent = `Checking ${integrityReport.attempted || 0} DOI records`;
     else {
       const summary = integrityReport.summary || {};
       const parts = [`${summary.checked || 0} checked`];
-      if (summary.failed) parts.push(`${summary.failed} unresolved`);
+      if (summary.failed) parts.push(`${summary.failed} not verified`);
       if (integrityReport.notChecked) parts.push(`${integrityReport.notChecked} deferred`);
-      parts.push(integrityReport.provider || 'Crossref');
       el.integrityCoverage.textContent = parts.join(' · ');
     }
   }
@@ -264,10 +307,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const placeholder = document.createElement('li');
       placeholder.className = 'placeholder';
       placeholder.textContent = allRecords.length
-        ? 'No results match the selected filter.'
-        : 'No enabled publisher matches or known formal integrity signals were found.';
+        ? 'No references match this filter.'
+        : 'No publisher matches or known formal updates were found.';
       el.contextList.appendChild(placeholder);
-      el.referencesSummary.textContent = allRecords.length ? `0 of ${allRecords.length} items shown.` : 'No actionable context found.';
+      el.referencesSummary.textContent = allRecords.length ? `0 of ${allRecords.length} references shown` : 'Nothing to review';
       return;
     }
 
@@ -278,35 +321,42 @@ document.addEventListener('DOMContentLoaded', () => {
       if (accent) {
         item.classList.add('context-item-accented');
         item.style.setProperty('--context-accent', accent);
-        item.style.setProperty('--context-tint', rgba(accent, 0.04));
+        item.style.setProperty('--context-tint', rgba(accent, 0.025));
       }
       if (record.id) {
         item.dataset.refId = record.id;
         item.tabIndex = 0;
       }
+
       const heading = document.createElement('div');
       heading.className = 'context-item-heading';
       const label = document.createElement('strong');
       label.textContent = record.kind === 'search-result' ? `Search result ${record.number || ''}`.trim() : `Reference ${record.number || ''}`.trim();
       const doi = document.createElement('code');
       doi.textContent = record.doi || '';
+      doi.title = record.doi || '';
       heading.append(label, doi);
       item.appendChild(heading);
-      if (record.text) {
+
+      const cleanedText = cleanReferenceText(record);
+      if (cleanedText) {
         const text = document.createElement('p');
-        text.textContent = record.text;
+        text.textContent = cleanedText;
+        text.title = cleanedText;
         item.appendChild(text);
       }
+
       const chips = document.createElement('div');
       chips.className = 'chip-row';
-      for (const match of record.matches || []) chips.appendChild(chip(`${match.profileName} · ${match.action}`, match.color));
+      for (const match of record.matches || []) chips.appendChild(chip(match.profileName, match.color));
       appendIntegrityChips(chips, record.events || [], record.primaryStatus);
-      item.appendChild(chips);
+      if (chips.childElementCount) item.appendChild(chips);
       el.contextList.appendChild(item);
     }
+
     el.referencesSummary.textContent = records.length === allRecords.length
-      ? `${records.length} item${records.length === 1 ? '' : 's'} with watchlist or formal integrity context.`
-      : `${records.length} of ${allRecords.length} items shown.`;
+      ? `${records.length} reference${records.length === 1 ? '' : 's'} shown`
+      : `${records.length} of ${allRecords.length} references shown`;
   }
 
   function renderAll() {
@@ -364,7 +414,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   el.manage.addEventListener('click', () => chrome.runtime.openOptionsPage());
   el.rescan.addEventListener('click', forceRescan);
-  el.contextFilter.addEventListener('change', renderContextList);
+  el.contextFilter.addEventListener('change', () => {
+    setIntegrityCounts();
+    renderContextList();
+  });
   el.contextSort.addEventListener('change', renderContextList);
 
   el.contextList.addEventListener('click', event => {
