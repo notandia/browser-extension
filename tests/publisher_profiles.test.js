@@ -65,7 +65,7 @@ test('runtime and interfaces load the general publisher system', () => {
   assert.ok(manifest.content_scripts[0].js.includes('shared/publisher_profiles.js'));
   assert.ok(manifest.content_scripts[0].js.includes('content/publisher_profile_scanner.js'));
   assert.match(popupHtml, /Article context/);
-  assert.match(popupHtml, /Report article\/context issue/);
+  assert.match(popupHtml, /Report (?:an )?article\/context issue/);
   assert.match(options, /MDPI and Frontiers are enabled and highlighted by default/);
   assert.doesNotMatch(options, /grey publisher/i);
   assert.match(scanner, /data-notandia-profile-signature/);
