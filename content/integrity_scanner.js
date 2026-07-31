@@ -134,7 +134,9 @@
   }
 
   function referenceNumber(element, index) {
-    for (const attribute of ['data-counter', 'data-content', 'data-number', 'data-reference-number']) {
+    const counter = positiveNumber(element.getAttribute?.('data-counter'));
+    if (counter) return counter;
+    for (const attribute of ['data-content', 'data-number', 'data-reference-number']) {
       const number = positiveNumber(element.getAttribute?.(attribute));
       if (number) return number;
     }
@@ -180,7 +182,11 @@
       }
 
       const pageDoi = extractCurrentArticleDoi();
-      const fingerprint = JSON.stringify([pageDoi, references.map(reference => [reference.id, reference.number, reference.doi])]);
+      const fingerprint = JSON.stringify([
+        pageDoi,
+        references.map(reference => [reference.id, reference.doi]),
+        references.map(reference => reference.number)
+      ]);
       if (fingerprint === lastFingerprint) return;
       lastFingerprint = fingerprint;
       runtime.sendMessage({ type: 'integrityScan', data: { pageDoi, references } });
