@@ -4,6 +4,9 @@
   if (window.notandiaIntegrityPresentationInjected) return;
   window.notandiaIntegrityPresentationInjected = true;
 
+  const runtime = window.NotandiaRuntime;
+  if (!runtime?.isAvailable()) return;
+
   const FALLBACK_STATUSES = {
     retracted: { label: 'Retracted', icon: '×', color: '#B42318' },
     'expression-of-concern': { label: 'Expression of concern', icon: '!', color: '#B54708' },
@@ -15,10 +18,18 @@
   const SAFE_STATUS = /^[a-z0-9-]{1,64}$/;
   const SAFE_REFERENCE_ID = /^[A-Za-z0-9_.:-]{1,256}$/;
   let pollTimer = null;
+  let observer = null;
   let lastFingerprint = '';
   let firstMissingReportAt = 0;
   let lastRecoveryRequestAt = 0;
   let applyingPresentation = false;
+
+  function stop() {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+    observer?.disconnect();
+    observer = null;
+  }
 
   function normalizeDoi(value) {
     if (typeof value !== 'string') return null;
@@ -56,6 +67,7 @@
   }
 
   function schedule(delay = 1000) {
+    if (!runtime.isAvailable()) return stop();
     clearTimeout(pollTimer);
     pollTimer = setTimeout(requestReport, delay);
   }
@@ -161,13 +173,17 @@
     if (!firstMissingReportAt) firstMissingReportAt = now;
     if (now - firstMissingReportAt < 1200 || now - lastRecoveryRequestAt < 5000) return;
     lastRecoveryRequestAt = now;
-    chrome.runtime.sendMessage({ type: 'integrityPresentationNeedsRescan' }, () => void chrome.runtime.lastError);
+    if (!runtime.sendMessage({ type: 'integrityPresentationNeedsRescan' })) stop();
   }
 
   function requestReport() {
+    if (!runtime.isAvailable()) return stop();
     if (document.hidden) return schedule(1500);
-    chrome.runtime.sendMessage({ type: 'getIntegrityReport' }, response => {
-      if (chrome.runtime.lastError) return schedule(1500);
+    const sent = runtime.sendMessage({ type: 'getIntegrityReport' }, (response, error) => {
+      if (error) {
+        if (!runtime.isAvailable()) return stop();
+        return schedule(1500);
+      }
       const report = response?.report || null;
       if (!report) {
         requestRecovery();
@@ -182,25 +198,32 @@
       if (report.state === 'ready') applyReport(report, response?.statuses || FALLBACK_STATUSES);
       schedule(report.state === 'loading' ? 750 : 5000);
     });
+    if (!sent) stop();
   }
 
-  chrome.runtime.onMessage.addListener(message => {
-    if (message?.type === 'integrityReportUpdated') schedule(50);
-  });
+  try {
+    chrome.runtime.onMessage.addListener(message => {
+      if (message?.type === 'integrityReportUpdated') schedule(50);
+    });
 
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'sync' || !changes.integrityLookupsEnabled) return;
-    if (changes.integrityLookupsEnabled.newValue !== true) {
-      lastFingerprint = '';
-      firstMissingReportAt = 0;
-      clearPresentation();
-    } else schedule(0);
-  });
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'sync' || !changes.integrityLookupsEnabled) return;
+      if (changes.integrityLookupsEnabled.newValue !== true) {
+        lastFingerprint = '';
+        firstMissingReportAt = 0;
+        clearPresentation();
+      } else schedule(0);
+    });
+  } catch (error) {
+    if (runtime.isInvalidationError(error)) return stop();
+    throw error;
+  }
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) schedule(0);
   });
-  const observer = new MutationObserver(() => {
+  observer = new MutationObserver(() => {
+    if (!runtime.isAvailable()) return stop();
     if (!applyingPresentation) schedule(300);
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
