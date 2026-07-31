@@ -6,16 +6,22 @@
 
   const runtime = window.NotandiaRuntime;
   if (!runtime?.isAvailable()) return;
+  let finishTimer = null;
 
-  function announceStart(reason) {
+  function announceStart(reason, fallbackDelay) {
+    clearTimeout(finishTimer);
     runtime.sendMessage({ type: 'publisherScanStarted', reason: String(reason || 'scan').slice(0, 32) });
+    finishTimer = setTimeout(() => {
+      finishTimer = null;
+      runtime.sendMessage({ type: 'publisherScanFinished' });
+    }, fallbackDelay);
   }
 
-  announceStart('initial');
+  announceStart('initial', 4000);
 
   try {
     chrome.runtime.onMessage.addListener(message => {
-      if (message?.type === 'forcePublisherRescan') announceStart('manual');
+      if (message?.type === 'forcePublisherRescan') announceStart('manual', 2500);
       return false;
     });
   } catch (error) {
