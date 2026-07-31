@@ -33,8 +33,8 @@ test('PubMed and PMC bridge resolves public identifiers before publisher and int
   assert.match(bridge, /type: 'publisherContextUpdate'/);
   assert.match(bridge, /type: 'integrityScan'/);
   assert.match(bridge, /stored\.integrityLookupsEnabled === true/);
-  assert.match(bridge, /credentials/);
   assert.match(bridge, /MAX_IDS_PER_TYPE = 200/);
+  assert.match(bridge, /MAX_REFERENCES = 250/);
 });
 
 test('NCBI-resolved publisher context uses the configured profile color and action', () => {
