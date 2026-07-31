@@ -5,6 +5,8 @@
   globalThis.NotandiaLiveContextRuntime = true;
 
   const baseRefreshBadge = refreshBadge;
+  const publisherScanningTabs = new Set();
+  const publisherScanTimers = new Map();
 
   function contextKey(record, fallback = '') {
     const doi = normalizeDOI(record?.doi || '');
@@ -12,26 +14,72 @@
     return `${record?.kind || 'item'}:${record?.id || fallback}`;
   }
 
+  function setScanningBadge(tabId, title = 'Scanning scholarly context…') {
+    if (!Number.isInteger(tabId)) return;
+    chrome.action.setBadgeText({ tabId, text: '…' });
+    chrome.action.setBadgeBackgroundColor({ tabId, color: '#48627A' });
+    chrome.action.setTitle({ tabId, title });
+  }
+
+  function announceScanState(tabId) {
+    chrome.runtime.sendMessage({ type: 'publisherScanStateUpdated', tabId }, () => void chrome.runtime.lastError);
+  }
+
+  function markPublisherScanning(tabId) {
+    if (!Number.isInteger(tabId)) return;
+    publisherScanningTabs.add(tabId);
+    const existing = publisherScanTimers.get(tabId);
+    if (existing) clearTimeout(existing);
+    publisherScanTimers.set(tabId, setTimeout(() => {
+      publisherScanTimers.delete(tabId);
+      publisherScanningTabs.delete(tabId);
+      refreshCombinedContextBadge(tabId);
+      announceScanState(tabId);
+    }, 15000));
+    setScanningBadge(tabId, 'Scanning publisher profiles and citation links…');
+    announceScanState(tabId);
+  }
+
+  function finishPublisherScanning(tabId) {
+    if (!Number.isInteger(tabId)) return;
+    publisherScanningTabs.delete(tabId);
+    const timer = publisherScanTimers.get(tabId);
+    if (timer) clearTimeout(timer);
+    publisherScanTimers.delete(tabId);
+    refreshCombinedContextBadge(tabId);
+    announceScanState(tabId);
+  }
+
   function refreshCombinedContextBadge(tabId) {
     if (!Number.isInteger(tabId)) return;
     const publisher = publisherTabData.get(tabId);
     const integrity = integrityTabData.get(tabId);
+
+    if (publisherScanningTabs.has(tabId) || integrity?.state === 'loading') {
+      const completed = Math.max(0, Math.trunc(Number(integrity?.completed) || 0));
+      const attempted = Math.max(0, Math.trunc(Number(integrity?.attempted) || 0));
+      const title = integrity?.state === 'loading' && attempted
+        ? `Scanning scholarly context · formal updates ${completed}/${attempted}`
+        : 'Scanning publisher profiles and citation links…';
+      setScanningBadge(tabId, title);
+      return;
+    }
+
     const allKeys = new Set();
     const publisherKeys = new Set();
     const integrityKeys = new Set();
-
     const publisherRecords = [
       publisher?.currentArticle,
       ...(publisher?.references || []),
       ...(publisher?.searchResults || [])
     ].filter(Boolean);
+
     for (const record of publisherRecords) {
       if (!(record.matches || []).some(match => match.action !== 'none')) continue;
       const key = contextKey(record, `publisher-${publisherKeys.size + 1}`);
       publisherKeys.add(key);
       allKeys.add(key);
     }
-
     for (const record of integrity?.records || []) {
       if (!record?.primaryStatus) continue;
       const key = contextKey(record, `integrity-${integrityKeys.size + 1}`);
@@ -164,10 +212,53 @@
     chrome.runtime.sendMessage({ type: 'integrityReportUpdated', tabId }, () => void chrome.runtime.lastError);
   };
 
-  chrome.runtime.onMessage.addListener(message => {
-    if ((message?.type === 'publisherContextUpdated' || message?.type === 'integrityReportUpdated') && Number.isInteger(message.tabId)) {
-      refreshCombinedContextBadge(message.tabId);
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    const senderTabId = sender.tab?.id;
+
+    if (message?.type === 'publisherScanStarted' && Number.isInteger(senderTabId)) {
+      markPublisherScanning(senderTabId);
+      sendResponse?.({ scanning: true });
+      return false;
     }
+
+    if (message?.type === 'publisherScanFinished' && Number.isInteger(senderTabId)) {
+      finishPublisherScanning(senderTabId);
+      sendResponse?.({ scanning: false });
+      return false;
+    }
+
+    if (message?.type === 'publisherContextUpdated' && Number.isInteger(message.tabId)) {
+      finishPublisherScanning(message.tabId);
+      return false;
+    }
+
+    if (message?.type === 'integrityReportUpdated' && Number.isInteger(message.tabId)) {
+      refreshCombinedContextBadge(message.tabId);
+      return false;
+    }
+
+    if (message?.type === 'getContextScanState') {
+      void getActiveTab().then(tab => {
+        const tabId = tab?.id;
+        if (!Number.isInteger(tabId)) return sendResponse({ publisherScanning: false, integrityScanning: false });
+        sendResponse({
+          publisherScanning: publisherScanningTabs.has(tabId),
+          integrityScanning: integrityTabData.get(tabId)?.state === 'loading'
+        });
+      }).catch(() => sendResponse({ publisherScanning: false, integrityScanning: false }));
+      return true;
+    }
+
     return false;
+  });
+
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status === 'loading') markPublisherScanning(tabId);
+  });
+  chrome.tabs.onRemoved.addListener(tabId => {
+    publisherScanningTabs.delete(tabId);
+    const timer = publisherScanTimers.get(tabId);
+    if (timer) clearTimeout(timer);
+    publisherScanTimers.delete(tabId);
   });
 })();
