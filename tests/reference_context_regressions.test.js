@@ -4,9 +4,25 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 const source = relativePath => fs.readFileSync(path.join(root, relativePath), 'utf8');
+
+function fakeReference({ syntheticId, targetId = null, counter = null }) {
+  return {
+    id: '',
+    querySelector(selector) {
+      if (selector === 'p.c-article-references__text[id]' && targetId) return { id: targetId };
+      return null;
+    },
+    getAttribute(name) {
+      if (name === 'data-mdpi-filter-ref-id') return syntheticId;
+      if (name === 'data-counter') return counter;
+      return null;
+    }
+  };
+}
 
 test('inline selectors map synthetic scan IDs to the real bibliography target', () => {
   const mapper = source('content/inline_reference_mapper.js');
@@ -18,6 +34,41 @@ test('inline selectors map synthetic scan IDs to the real bibliography target', 
   assert.match(mapper, /utils\.generateInlineFootnoteSelectors = function/);
   assert.match(mapper, /baseGenerator\(targetId\)/);
   assert.match(mapper, /utils\.resolveInlineReferenceTarget = actualTargetId/);
+});
+
+test('Nature citations remain attached to their exact bibliography numbers', () => {
+  const references = [
+    fakeReference({ syntheticId: 'notandia-reference-38', targetId: 'ref-CR34', counter: '34.' }),
+    fakeReference({ syntheticId: 'notandia-reference-42', targetId: 'ref-CR38', counter: '38.' }),
+    fakeReference({ syntheticId: 'notandia-reference-95', targetId: 'ref-CR91', counter: '91.' }),
+    fakeReference({ syntheticId: 'notandia-reference-25', counter: '25.' })
+  ];
+  const context = {
+    window: {
+      MDPIFilterUtils: {
+        generateInlineFootnoteSelectors(referenceId) {
+          return `selectors:${referenceId}`;
+        }
+      }
+    },
+    document: {
+      querySelectorAll(selector) {
+        return selector === '[data-mdpi-filter-ref-id]' ? references : [];
+      },
+      getElementById() {
+        return null;
+      }
+    }
+  };
+
+  vm.createContext(context);
+  vm.runInContext(source('content/inline_reference_mapper.js'), context);
+
+  const generate = context.window.MDPIFilterUtils.generateInlineFootnoteSelectors;
+  assert.equal(generate('notandia-reference-38'), 'selectors:ref-CR34');
+  assert.equal(generate('notandia-reference-42'), 'selectors:ref-CR38');
+  assert.equal(generate('notandia-reference-95'), 'selectors:ref-CR91');
+  assert.equal(generate('notandia-reference-25'), 'selectors:25');
 });
 
 test('the mapper loads before every publisher and integrity inline-style consumer', () => {
