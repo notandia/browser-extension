@@ -43,6 +43,8 @@
       ],
       "js": [
         "shared/publisher_profiles.js",
+        "content/runtime_guard.js",
+        "content/publisher_scan_indicator.js",
         "content/utils.js",
         "content/sanitizer.js",
         "content/domains.js",
@@ -71,8 +73,5 @@
       ],
       "run_at": "document_idle"
     }
-  ],
-  "externally_connectable": {
-    "matches": []
-  }
+  ]
 }
