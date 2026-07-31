@@ -3,30 +3,102 @@
 (() => {
   const SAFE_REFERENCE_ID = /^[A-Za-z0-9_.:-]{1,256}$/;
 
-  function findReferenceElement(referenceId) {
+  function normalizeDoi(value) {
+    return String(value || '')
+      .trim()
+      .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '')
+      .replace(/[),.;:\]}>'"`]+$/g, '')
+      .toLowerCase();
+  }
+
+  function normalizedText(element) {
+    const clone = element.cloneNode(true);
+    clone.querySelectorAll('.notandia-publisher-badges,.notandia-integrity-chip').forEach(node => node.remove());
+    return String(clone.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function isVisible(element) {
+    if (!(element instanceof HTMLElement)) return false;
+    const style = getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+  }
+
+  function candidateScore(element, referenceId) {
+    let score = 0;
+    if (isVisible(element)) score += 500;
+    else score -= 500;
+    if (element.matches('li.c-article-references__item')) score += 450;
+    if (element.closest('#references,[role="doc-bibliography"],.c-article-references')) score += 250;
+    if (element.matches('[data-counter]')) score += 80;
+    if (element.id === referenceId) score += 100;
+    if (element.getAttribute('data-mdpi-filter-ref-id') === referenceId) score += 100;
+    if (element.closest('.c-reading-companion,.c-reading-companion__reference-item')) score -= 600;
+    if (/^(?:mdpi|notandia)-ref-/i.test(element.getAttribute('data-mdpi-filter-ref-id') || '')) score -= 40;
+    return score;
+  }
+
+  function referenceCandidates(message) {
+    const candidates = new Set();
     for (const element of document.querySelectorAll('[data-mdpi-filter-ref-id]')) {
-      if (element.getAttribute('data-mdpi-filter-ref-id') === referenceId) {
-        return element;
+      if (element.getAttribute('data-mdpi-filter-ref-id') === message.refId) candidates.add(element);
+    }
+    const byId = document.getElementById(message.refId);
+    if (byId) candidates.add(byId.closest('li,[role="listitem"]') || byId);
+
+    let referenceNodes = [];
+    try {
+      if (typeof window.MDPIFilterReferenceSelectors === 'string') {
+        referenceNodes = Array.from(document.querySelectorAll(window.MDPIFilterReferenceSelectors));
+      }
+    } catch {
+      referenceNodes = [];
+    }
+
+    const requestedDoi = normalizeDoi(message.doi);
+    const requestedText = String(message.text || '').replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 140);
+    for (const element of referenceNodes) {
+      if (requestedDoi) {
+        const doiFound = Array.from(element.querySelectorAll('a[href]')).some(anchor =>
+          normalizeDoi(anchor.getAttribute('href')).includes(requestedDoi)
+        ) || normalizedText(element).includes(requestedDoi);
+        if (doiFound) candidates.add(element);
+      }
+      if (requestedText.length >= 24) {
+        const text = normalizedText(element);
+        if (text.includes(requestedText) || requestedText.includes(text.slice(0, 100))) candidates.add(element);
       }
     }
-    return null;
+    return Array.from(candidates);
+  }
+
+  function findReferenceElement(message) {
+    return referenceCandidates(message)
+      .sort((left, right) => candidateScore(right, message.refId) - candidateScore(left, message.refId))[0] || null;
+  }
+
+  function animateReference(reference, color) {
+    reference.style.setProperty('--notandia-scroll-color', /^#[0-9a-f]{6}$/i.test(String(color || '')) ? color : '#48627A');
+    reference.classList.remove('notandia-scroll-target');
+    void reference.offsetWidth;
+    reference.classList.add('notandia-scroll-target');
+    setTimeout(() => reference.classList.remove('notandia-scroll-target'), 1800);
+  }
+
+  function scrollAndAnimate(reference, color) {
+    reference.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    requestAnimationFrame(() => animateReference(reference, color));
   }
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (sender.id !== chrome.runtime.id || !message || typeof message !== 'object') {
-      return false;
-    }
-
-    if (message.type !== 'scrollToRefOnPage') {
-      return false;
-    }
+    if (sender.id !== chrome.runtime.id || !message || typeof message !== 'object') return false;
+    if (message.type !== 'scrollToRefOnPage') return false;
 
     if (typeof message.refId !== 'string' || !SAFE_REFERENCE_ID.test(message.refId)) {
       sendResponse({ status: 'invalid-reference-id' });
       return false;
     }
 
-    const reference = findReferenceElement(message.refId);
+    const reference = findReferenceElement(message);
     if (!reference) {
       sendResponse({ status: 'not-found' });
       return false;
@@ -36,12 +108,15 @@
       ?.querySelector('.accordion__control[aria-expanded="false"]');
     if (collapsedControl instanceof HTMLElement) {
       collapsedControl.click();
+      setTimeout(() => {
+        scrollAndAnimate(reference, message.color);
+        sendResponse({ status: 'expanded-and-scrolled' });
+      }, 250);
+      return true;
     }
 
-    reference.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    reference.classList.add('mdpi-ref-scroll-highlight');
-    setTimeout(() => reference.classList.remove('mdpi-ref-scroll-highlight'), 1500);
-    sendResponse({ status: collapsedControl ? 'expanded-and-scrolled' : 'scrolled' });
+    scrollAndAnimate(reference, message.color);
+    sendResponse({ status: 'scrolled' });
     return false;
   });
 })();

@@ -6,7 +6,10 @@
     "scripts": [
       "shared/publisher_profiles.js",
       "shared/integrity.js",
-      "background.js"
+      "background_support.js",
+      "background.js",
+      "background_persistence.js",
+      "background_live_context.js"
     ]
   },
   "browser_specific_settings": {

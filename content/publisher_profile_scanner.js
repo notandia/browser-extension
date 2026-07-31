@@ -13,9 +13,13 @@
   const MAX_TEXT = 500;
   const STYLE_ATTRIBUTE = 'data-notandia-profile-style';
   const SIGNATURE_ATTRIBUTE = 'data-notandia-profile-signature';
+  const INLINE_ACTION_ATTRIBUTE = 'data-notandia-publisher-action';
+  const INLINE_PROFILE_ATTRIBUTE = 'data-notandia-publisher-profile';
   const STYLE_PROPERTIES = Object.freeze(['display', 'opacity', 'border-left', 'padding-left', 'background-color']);
-  const LEGACY_MDPI_SELECTOR = '.mdpi-highlighted-reference,.mdpi-potential-reference,.mdpi-hidden-reference,.mdpi-highlighted-google,.mdpi-potential-google,.mdpi-search-result-highlight,.mdpi-search-result-hidden';
+  const OWN_NODE_SELECTOR = '.notandia-publisher-badges,.notandia-publisher-badge,.notandia-integrity-chip';
   const originalStyles = new WeakMap();
+  const managedElements = new Set();
+  const managedInlineAnchors = new Set();
   let settings = api.defaultSettings();
   let scanTimer = null;
   let lastFingerprint = '';
@@ -50,7 +54,7 @@
 
   function cleanElementText(element) {
     const clone = element.cloneNode(true);
-    clone.querySelectorAll('.notandia-publisher-badges,.notandia-mdpi-profile-badge').forEach(node => node.remove());
+    clone.querySelectorAll('.notandia-publisher-badges,.notandia-mdpi-profile-badge,.notandia-integrity-chip').forEach(node => node.remove());
     return String(clone.textContent || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT);
   }
 
@@ -86,18 +90,42 @@
   function safeRecordId(element, index, kind) {
     const existing = element.dataset?.mdpiFilterRefId || element.id || element.getAttribute?.('data-bib-id') || element.getAttribute?.('data-reference-id');
     const normalized = String(existing || '').trim();
-    if (/^[A-Za-z0-9_.:-]{1,256}$/.test(normalized)) return normalized;
-    const generated = `notandia-${kind}-${index + 1}`;
-    element.setAttribute('data-mdpi-filter-ref-id', generated);
-    return generated;
+    const id = /^[A-Za-z0-9_.:-]{1,256}$/.test(normalized) ? normalized : `notandia-${kind}-${index + 1}`;
+    element.setAttribute('data-mdpi-filter-ref-id', id);
+    return id;
+  }
+
+  function referenceNumber(element, index) {
+    const counter = String(element.getAttribute?.('data-counter') || '').match(/\d+/)?.[0];
+    const numericCounter = Number(counter);
+    if (Number.isFinite(numericCounter) && numericCounter > 0) return numericCounter;
+
+    const aria = String(element.getAttribute?.('aria-label') || '').match(/(?:reference|citation)\s*(\d+)/i)?.[1];
+    const numericAria = Number(aria);
+    if (Number.isFinite(numericAria) && numericAria > 0) return numericAria;
+
+    const identifier = String(element.dataset?.mdpiFilterRefId || element.id || '');
+    const knownPattern = identifier.match(/(?:^|[-_:])(?:ref(?:erence)?|cr|cit|bib|b|r)?[-_:]*0*(\d+)$/i)?.[1];
+    const numericIdentifier = Number(knownPattern);
+    return Number.isFinite(numericIdentifier) && numericIdentifier > 0 ? numericIdentifier : index + 1;
+  }
+
+  function configuredReferenceSelector() {
+    const selector = window.MDPIFilterReferenceSelectors;
+    return typeof selector === 'string' && selector.trim() ? selector : '';
   }
 
   function referenceNodes() {
-    const selector = window.MDPIFilterReferenceSelectors;
-    if (typeof selector !== 'string' || !selector.trim()) return [];
+    const selector = configuredReferenceSelector();
+    if (!selector) return [];
     try {
-      const nodes = Array.from(document.querySelectorAll(selector));
-      return nodes.filter(node => !nodes.some(other => other !== node && other.contains(node))).slice(0, MAX_REFERENCES);
+      let nodes = Array.from(document.querySelectorAll(selector));
+      nodes = nodes.filter(node => !nodes.some(other => other !== node && other.contains(node)));
+      const hasNatureMainBibliography = nodes.some(node => node.matches?.('li.c-article-references__item'));
+      if (hasNatureMainBibliography) {
+        nodes = nodes.filter(node => !node.closest?.('.c-reading-companion,.c-reading-companion__reference-item'));
+      }
+      return nodes.slice(0, MAX_REFERENCES);
     } catch {
       return [];
     }
@@ -119,33 +147,6 @@
     return `rgba(${parseInt(match[1], 16)},${parseInt(match[2], 16)},${parseInt(match[3], 16)},${alpha})`;
   }
 
-  function legacyTargets(element) {
-    const targets = [];
-    if (element.matches?.(LEGACY_MDPI_SELECTOR)) targets.push(element);
-    for (const target of element.querySelectorAll?.(LEGACY_MDPI_SELECTOR) || []) targets.push(target);
-    return targets;
-  }
-
-  function legacyMdpiSignal(element) {
-    const target = legacyTargets(element)[0];
-    if (!target) return null;
-    const potential = target.classList.contains('mdpi-potential-reference') || target.classList.contains('mdpi-potential-google');
-    return potential ? 'potential' : 'confirmed';
-  }
-
-  function clearLegacyMdpiPresentation(element) {
-    for (const target of legacyTargets(element)) {
-      target.classList.remove(
-        'mdpi-highlighted-reference', 'mdpi-potential-reference', 'mdpi-hidden-reference',
-        'mdpi-highlighted-google', 'mdpi-potential-google', 'mdpi-search-result-highlight', 'mdpi-search-result-hidden'
-      );
-      for (const property of ['display', 'opacity', 'border', 'border-left', 'padding', 'padding-left', 'background-color', 'outline', 'box-shadow']) {
-        target.style.removeProperty(property);
-      }
-    }
-    element.querySelectorAll?.(':scope > .notandia-mdpi-profile-badge').forEach(node => node.remove());
-  }
-
   function rememberOriginalStyles(element) {
     if (originalStyles.has(element)) return;
     const snapshot = {};
@@ -160,10 +161,7 @@
 
   function restoreOriginalStyles(element) {
     const snapshot = originalStyles.get(element);
-    if (!snapshot) {
-      for (const property of STYLE_PROPERTIES) element.style.removeProperty(property);
-      return;
-    }
+    if (!snapshot) return;
     for (const [property, state] of Object.entries(snapshot)) {
       if (state.value) element.style.setProperty(property, state.value, state.priority);
       else element.style.removeProperty(property);
@@ -172,13 +170,17 @@
   }
 
   function clearProfileStyle(element) {
-    const hasStyle = element?.hasAttribute?.(STYLE_ATTRIBUTE) || element?.hasAttribute?.(SIGNATURE_ATTRIBUTE);
-    const badges = element?.querySelectorAll?.(':scope > .notandia-publisher-badges') || [];
-    if (!hasStyle && badges.length === 0) return;
+    if (!element) return;
+    const hasManagedState = managedElements.has(element) ||
+      element.hasAttribute?.(STYLE_ATTRIBUTE) ||
+      element.hasAttribute?.(SIGNATURE_ATTRIBUTE) ||
+      Boolean(element.querySelector?.(':scope > .notandia-publisher-badges'));
+    if (!hasManagedState) return;
     restoreOriginalStyles(element);
-    badges.forEach(node => node.remove());
+    element.querySelectorAll?.(':scope > .notandia-publisher-badges').forEach(node => node.remove());
     element.removeAttribute(STYLE_ATTRIBUTE);
     element.removeAttribute(SIGNATURE_ATTRIBUTE);
+    managedElements.delete(element);
   }
 
   function addBadges(element, matches) {
@@ -225,28 +227,67 @@
   function applyStyle(element, matches) {
     const signature = styleSignature(matches);
     const currentSignature = element.getAttribute(SIGNATURE_ATTRIBUTE) || '';
-    const hasLegacy = legacyTargets(element).length > 0 || Boolean(element.querySelector?.(':scope > .notandia-mdpi-profile-badge'));
-    const hasBadges = Boolean(element.querySelector?.(':scope > .notandia-publisher-badges'));
-    const needsBadges = matches.some(match => match.action !== 'none');
     const visual = api.resolveVisualMatch(matches);
-
-    if (currentSignature === signature && hasBadges === needsBadges) {
-      if (hasLegacy) {
-        clearLegacyMdpiPresentation(element);
-        if (visual) applyVisualProperties(element, visual);
-      }
-      return;
-    }
+    const badges = element.querySelectorAll?.(':scope > .notandia-publisher-badges') || [];
+    const expectedBadges = matches.some(match => match.action !== 'none');
+    if (currentSignature === signature && Boolean(badges.length) === expectedBadges) return;
 
     clearProfileStyle(element);
-    if (hasLegacy) clearLegacyMdpiPresentation(element);
     if (!matches.length || !visual) return;
-
     rememberOriginalStyles(element);
     element.setAttribute(STYLE_ATTRIBUTE, visual.profileId);
     element.setAttribute(SIGNATURE_ATTRIBUTE, signature);
     addBadges(element, matches);
     applyVisualProperties(element, visual);
+    managedElements.add(element);
+  }
+
+  function clearInlineAnchor(anchor) {
+    anchor.classList.remove('notandia-publisher-citation');
+    anchor.removeAttribute(INLINE_ACTION_ATTRIBUTE);
+    anchor.removeAttribute(INLINE_PROFILE_ATTRIBUTE);
+    anchor.style.removeProperty('--notandia-profile-color');
+    managedInlineAnchors.delete(anchor);
+  }
+
+  function styleInlineCitations(record) {
+    const visual = api.resolveVisualMatch(record.matches || []);
+    if (!visual || !['highlight', 'dim', 'hide'].includes(visual.action)) return [];
+    const generator = window.MDPIFilterUtils?.generateInlineFootnoteSelectors;
+    if (typeof generator !== 'function') return [];
+    const selectors = generator(record.id);
+    if (!selectors) return [];
+    const styled = [];
+    try {
+      for (const matched of document.querySelectorAll(selectors)) {
+        const anchor = matched.tagName?.toLowerCase() === 'a' ? matched : matched.querySelector?.('a');
+        if (!(anchor instanceof HTMLAnchorElement)) continue;
+        anchor.classList.add('notandia-publisher-citation');
+        anchor.setAttribute(INLINE_ACTION_ATTRIBUTE, visual.action);
+        anchor.setAttribute(INLINE_PROFILE_ATTRIBUTE, visual.profileId);
+        anchor.style.setProperty('--notandia-profile-color', visual.color);
+        managedInlineAnchors.add(anchor);
+        styled.push(anchor);
+      }
+    } catch {
+      return [];
+    }
+    return styled;
+  }
+
+  function buildRecord(element, index, kind) {
+    const text = cleanElementText(element);
+    const evidence = evidenceFromElement(element, text);
+    const matches = api.matchProfiles(settings, evidence);
+    return {
+      element,
+      id: safeRecordId(element, index, kind),
+      kind,
+      number: kind === 'reference' ? referenceNumber(element, index) : index + 1,
+      doi: evidence.dois[0] || null,
+      text,
+      matches
+    };
   }
 
   function ensureStyleSheet() {
@@ -256,62 +297,44 @@
     style.textContent = `
       .notandia-publisher-badges{display:flex!important;flex-wrap:wrap!important;gap:4px!important;margin:3px 0 5px!important;font:600 11px/1.2 system-ui,-apple-system,sans-serif!important}
       .notandia-publisher-badge{display:inline-flex!important;align-items:center!important;border:1px solid var(--notandia-profile-color)!important;border-radius:999px!important;padding:2px 6px!important;color:var(--notandia-profile-color)!important;background:#fff!important;letter-spacing:.01em!important}
+      .notandia-publisher-citation[data-notandia-publisher-action="highlight"]:not(.notandia-integrity-citation),
+      .notandia-publisher-citation[data-notandia-publisher-action="highlight"]:not(.notandia-integrity-citation) *{color:var(--notandia-profile-color)!important;font-weight:800!important;text-decoration-line:underline!important;text-decoration-style:dotted!important;text-decoration-color:var(--notandia-profile-color)!important;text-decoration-thickness:2px!important;text-underline-offset:2px!important}
+      .notandia-publisher-citation[data-notandia-publisher-action="dim"]:not(.notandia-integrity-citation){opacity:.45!important}
+      .notandia-publisher-citation[data-notandia-publisher-action="hide"]:not(.notandia-integrity-citation){display:none!important}
     `;
     document.documentElement.appendChild(style);
   }
 
-  function matchesForElement(evidence, legacySignal) {
-    const matches = api.matchProfiles(settings, evidence);
-    const mdpi = api.profileMap(settings).get('mdpi');
-    if (legacySignal && mdpi?.enabled && !matches.some(match => match.profileId === 'mdpi')) {
-      if (legacySignal === 'confirmed' || mdpi.confidencePolicy === 'confirmed-and-potential') {
-        matches.push({
-          profileId: 'mdpi', profileName: mdpi.name, confidence: legacySignal,
-          reasons: ['legacy-mdpi-detector'], action: mdpi.action, color: mdpi.color
-        });
-      }
-    }
-    return matches;
-  }
-
-  function buildRecord(element, index, kind) {
-    const legacySignal = legacyMdpiSignal(element);
-    const text = cleanElementText(element);
-    const evidence = evidenceFromElement(element, text);
-    const matches = matchesForElement(evidence, legacySignal);
-    applyStyle(element, matches);
-    return {
-      id: safeRecordId(element, index, kind),
-      kind,
-      number: index + 1,
-      doi: evidence.dois[0] || null,
-      text,
-      matches
-    };
-  }
-
-  function clearUnmanagedLegacyStyles(managed) {
-    for (const element of document.querySelectorAll(LEGACY_MDPI_SELECTOR)) {
-      const owner = managed.find(candidate => candidate === element || candidate.contains(element));
-      if (!owner) clearLegacyMdpiPresentation(element);
-    }
-  }
-
   function scan() {
     ensureStyleSheet();
-    const referenceElements = referenceNodes();
-    const searchElements = searchNodes();
-    const managed = Array.from(new Set([...referenceElements, ...searchElements]));
+    const referenceRecords = referenceNodes().map((element, index) => buildRecord(element, index, 'reference'));
+    const searchRecords = searchNodes().map((element, index) => buildRecord(element, index, 'search-result'));
+    const allElements = new Set([...referenceRecords, ...searchRecords].map(record => record.element));
+
+    for (const element of Array.from(managedElements)) {
+      if (!allElements.has(element)) clearProfileStyle(element);
+    }
+
+    const currentInline = new Set();
+    for (const record of [...referenceRecords, ...searchRecords]) {
+      applyStyle(record.element, record.matches);
+      if (record.kind === 'reference' && record.matches.length) {
+        for (const anchor of styleInlineCitations(record)) currentInline.add(anchor);
+      }
+    }
+    for (const anchor of Array.from(managedInlineAnchors)) {
+      if (!currentInline.has(anchor)) clearInlineAnchor(anchor);
+    }
+
     const currentEvidence = currentArticleEvidence();
     const currentArticle = { doi: currentEvidence.dois[0] || null, matches: api.matchProfiles(settings, currentEvidence) };
-    const references = referenceElements.map((element, index) => buildRecord(element, index, 'reference')).filter(record => record.matches.length);
-    const searchResults = searchElements.map((element, index) => buildRecord(element, index, 'search-result')).filter(record => record.matches.length);
-    clearUnmanagedLegacyStyles(managed);
+    const references = referenceRecords.filter(record => record.matches.length).map(({ element, ...record }) => record);
+    const searchResults = searchRecords.filter(record => record.matches.length).map(({ element, ...record }) => record);
     const fingerprint = JSON.stringify([
       settings,
       currentArticle,
-      references.map(record => [record.id, record.matches.map(match => [match.profileId, match.action, match.confidence])]),
-      searchResults.map(record => [record.id, record.matches.map(match => [match.profileId, match.action, match.confidence])])
+      references.map(record => [record.id, record.number, record.doi, record.matches.map(match => [match.profileId, match.action, match.confidence])]),
+      searchResults.map(record => [record.id, record.number, record.doi, record.matches.map(match => [match.profileId, match.action, match.confidence])])
     ]);
     if (fingerprint === lastFingerprint) return;
     lastFingerprint = fingerprint;
@@ -340,18 +363,40 @@
     });
   }
 
-  chrome.storage.onChanged.addListener(changes => {
-    if (changes.publisherWatchlist || changes.mode || changes.highlightPotentialMdpiSites || changes.potentialMdpiHighlightColor) loadSettings();
-  });
-  chrome.runtime.onMessage.addListener(message => {
-    if (message?.type === 'forcePublisherRescan') {
-      lastFingerprint = '';
-      scheduleScan(0);
+  function nodeTouchesReferences(node) {
+    if (!(node instanceof Element)) return false;
+    if (node.matches(OWN_NODE_SELECTOR) || node.closest(OWN_NODE_SELECTOR)) return false;
+    const selector = configuredReferenceSelector();
+    if (!selector) return false;
+    try {
+      if (node.matches(selector) || node.querySelector(selector)) return true;
+      if (node.matches('a[href*="#"],a[href*="doi.org"],a[href*="10."]')) return true;
+      return Boolean(node.querySelector('a[href*="#"],a[href*="doi.org"],a[href*="10."]'));
+    } catch {
+      return false;
     }
+  }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && (changes.publisherWatchlist || changes.mode || changes.highlightPotentialMdpiSites || changes.potentialMdpiHighlightColor)) {
+      loadSettings();
+    }
+  });
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id || message?.type !== 'forcePublisherRescan') return false;
+    lastFingerprint = '';
+    scheduleScan(0);
+    sendResponse?.({ scheduled: true });
+    return false;
   });
 
   loadSettings();
-  const observer = new MutationObserver(() => scheduleScan(700));
+  const observer = new MutationObserver(mutations => {
+    if (mutations.some(mutation =>
+      Array.from(mutation.addedNodes).some(nodeTouchesReferences) ||
+      Array.from(mutation.removedNodes).some(nodeTouchesReferences)
+    )) scheduleScan(500);
+  });
   observer.observe(document.documentElement, { childList: true, subtree: true });
   setTimeout(() => scheduleScan(0), 1800);
 })();

@@ -1,0 +1,103 @@
+/* Formal integrity presentation is independent from publisher-watchlist styling. */
+.notandia-integrity-reference[data-notandia-integrity-status] {
+  box-sizing: border-box !important;
+  border-left: 4px solid var(--notandia-integrity-color, #B42318) !important;
+  padding-left: 8px !important;
+  background-color: var(--notandia-integrity-tint, rgba(180, 35, 24, 0.08)) !important;
+}
+
+/* Host journal CSS sometimes positions the first reference span as a marker.
+   Reset those rules so the publisher badge remains inside the highlighted item. */
+html body .notandia-publisher-badges {
+  all: initial !important;
+  box-sizing: border-box !important;
+  position: static !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  margin: 4px 0 6px !important;
+  padding: 0 !important;
+  float: none !important;
+  transform: none !important;
+  font: 600 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  white-space: normal !important;
+  isolation: isolate !important;
+}
+
+html body .notandia-publisher-badge {
+  all: initial !important;
+  box-sizing: border-box !important;
+  position: static !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 2px 7px !important;
+  float: none !important;
+  transform: none !important;
+  border: 1px solid var(--notandia-profile-color, #48627A) !important;
+  border-radius: 999px !important;
+  color: var(--notandia-profile-color, #48627A) !important;
+  background: #fff !important;
+  font: 700 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap !important;
+  text-transform: none !important;
+}
+
+.notandia-integrity-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin: 5px 0 !important;
+  padding: 2px 7px !important;
+  border: 1px solid var(--notandia-integrity-color, #B42318) !important;
+  border-radius: 999px !important;
+  color: var(--notandia-integrity-color, #B42318) !important;
+  background: #fff !important;
+  font: 700 11px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.notandia-integrity-citation,
+.notandia-integrity-citation * {
+  color: var(--notandia-integrity-color, #B42318) !important;
+  font-weight: 800 !important;
+  text-decoration-line: underline !important;
+  text-decoration-style: dotted !important;
+  text-decoration-color: var(--notandia-integrity-color, #B42318) !important;
+  text-decoration-thickness: 2px !important;
+  text-underline-offset: 2px !important;
+}
+
+@keyframes notandia-scroll-pulse {
+  0% {
+    outline-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+  18%, 72% {
+    outline-color: var(--notandia-scroll-color, #48627A);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--notandia-scroll-color, #48627A) 22%, transparent);
+  }
+  100% {
+    outline-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.notandia-scroll-target {
+  outline: 3px solid transparent !important;
+  outline-offset: 3px !important;
+  animation: notandia-scroll-pulse 1.7s ease-out 1 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notandia-scroll-target {
+    animation-duration: 0.01ms !important;
+    outline-color: var(--notandia-scroll-color, #48627A) !important;
+  }
+}
