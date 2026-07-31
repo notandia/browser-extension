@@ -4,12 +4,23 @@
   if (window.mdpiIntegrityScannerInjected) return;
   window.mdpiIntegrityScannerInjected = true;
 
+  const runtime = window.NotandiaRuntime;
+  if (!runtime?.isAvailable()) return;
+
   const MAX_REFERENCES = 250;
   const MAX_TEXT_LENGTH = 500;
   const DOI_PATTERN = /\b10\.\d{4,9}\/[A-Z0-9._;()/:+-]+/gi;
   const OWN_NODE_SELECTOR = '.notandia-publisher-badges,.notandia-integrity-chip,#notandia-publisher-profile-styles';
   let scanTimer = null;
+  let observer = null;
   let lastFingerprint = '';
+
+  function stop() {
+    clearTimeout(scanTimer);
+    scanTimer = null;
+    observer?.disconnect();
+    observer = null;
+  }
 
   function normalizeDoi(value) {
     if (typeof value !== 'string') return null;
@@ -117,20 +128,38 @@
     return generated;
   }
 
+  function positiveNumber(value) {
+    const number = Number(String(value || '').match(/0*(\d{1,5})/)?.[1]);
+    return Number.isFinite(number) && number > 0 ? number : null;
+  }
+
   function referenceNumber(element, index) {
-    const counter = String(element.getAttribute?.('data-counter') || '').match(/\d+/)?.[0];
-    const numericCounter = Number(counter);
-    if (Number.isFinite(numericCounter) && numericCounter > 0) return numericCounter;
+    for (const attribute of ['data-counter', 'data-content', 'data-number', 'data-reference-number']) {
+      const number = positiveNumber(element.getAttribute?.(attribute));
+      if (number) return number;
+    }
+
+    const aria = Number(String(element.getAttribute?.('aria-label') || '').match(/(?:reference|citation)\s*0*(\d+)/i)?.[1]);
+    if (Number.isFinite(aria) && aria > 0) return aria;
+
     const identifier = String(element.dataset?.mdpiFilterRefId || element.id || '');
-    const numericIdentifier = Number(identifier.match(/\d+(?!.*\d)/)?.[0]);
-    return Number.isFinite(numericIdentifier) && numericIdentifier > 0 ? numericIdentifier : index + 1;
+    for (const pattern of [
+      /^B0*(\d+)(?:[-_:]|$)/i,
+      /^(?:ref-CR|ref|reference|bib|cit|r)[-_:]?0*(\d+)(?:[-_:]|$)/i,
+      /(?:^|[-_:])(?:ref-CR|ref|reference|bib|cit|r)[-_:]?0*(\d+)(?:$|[-_:])/i
+    ]) {
+      const number = Number(identifier.match(pattern)?.[1]);
+      if (Number.isFinite(number) && number > 0) return number;
+    }
+    return index + 1;
   }
 
   function scanDocument() {
-    chrome.storage.sync.get({ integrityLookupsEnabled: false }, settings => {
-      if (chrome.runtime.lastError) return;
+    if (!runtime.isAvailable()) return stop();
+    runtime.storageGet('sync', { integrityLookupsEnabled: false }, (settings, error) => {
+      if (error || !runtime.isAvailable()) return stop();
       if (settings.integrityLookupsEnabled !== true) {
-        chrome.runtime.sendMessage({ type: 'integrityScanDisabled' }, () => void chrome.runtime.lastError);
+        runtime.sendMessage({ type: 'integrityScanDisabled' });
         return;
       }
 
@@ -151,14 +180,15 @@
       }
 
       const pageDoi = extractCurrentArticleDoi();
-      const fingerprint = JSON.stringify([pageDoi, references.map(reference => [reference.id, reference.doi])]);
+      const fingerprint = JSON.stringify([pageDoi, references.map(reference => [reference.id, reference.number, reference.doi])]);
       if (fingerprint === lastFingerprint) return;
       lastFingerprint = fingerprint;
-      chrome.runtime.sendMessage({ type: 'integrityScan', data: { pageDoi, references } }, () => void chrome.runtime.lastError);
+      runtime.sendMessage({ type: 'integrityScan', data: { pageDoi, references } });
     });
   }
 
   function scheduleScan(delay = 300) {
+    if (!runtime.isAvailable()) return stop();
     clearTimeout(scanTimer);
     scanTimer = setTimeout(scanDocument, delay);
   }
@@ -176,26 +206,32 @@
     }
   }
 
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (sender.id !== chrome.runtime.id || message?.type !== 'forceIntegrityRescan') return false;
-    lastFingerprint = '';
-    scheduleScan(0);
-    sendResponse({ scheduled: true });
-    return false;
-  });
-
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'sync' && changes.integrityLookupsEnabled) {
+  try {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (sender.id !== chrome.runtime.id || message?.type !== 'forceIntegrityRescan') return false;
       lastFingerprint = '';
       scheduleScan(0);
-    }
-  });
+      sendResponse({ scheduled: true });
+      return false;
+    });
+
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'sync' && changes.integrityLookupsEnabled) {
+        lastFingerprint = '';
+        scheduleScan(0);
+      }
+    });
+  } catch (error) {
+    if (runtime.isInvalidationError(error)) return stop();
+    throw error;
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => scheduleScan(0), { once: true });
   } else scheduleScan(0);
 
-  const observer = new MutationObserver(mutations => {
+  observer = new MutationObserver(mutations => {
+    if (!runtime.isAvailable()) return stop();
     for (const mutation of mutations) {
       for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) {
         if (nodeTouchesIntegrityContext(node)) {
