@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 29 July 2026
+Last updated: 31 July 2026
 
 Notandia, previously distributed as MDPI Filter, identifies user-selected publisher context and can optionally check scholarly DOI identifiers for formal post-publication updates.
 
@@ -38,7 +38,18 @@ When enabled, NCBI lookups send only validated DOI, PMID, or PMCID identifiers. 
 
 ## Storage
 
-The extension stores user settings, including publisher profiles, in browser synchronization storage. Lookup responses and per-tab context reports are cached only in the extension background process's memory and may disappear when it stops. The extension does not create an analytics profile or persistent browsing-history database.
+The extension stores user settings, including publisher profiles, in browser synchronization storage.
+
+Lookup-response caches remain only in the extension background process's memory. To recover the visible result state after a Manifest V3 service worker stops, the extension also stores a sanitized per-tab snapshot in browser session storage. A snapshot may contain normalized DOI identifiers, short bibliography text, detected publisher-profile matches, formal-update statuses, summary counts, and scan progress for the corresponding open tab.
+
+Session snapshots:
+
+- remain in memory and are not written to the extension's synchronized settings;
+- are available only to trusted extension contexts under the browser's default session-storage access rules;
+- are removed when the corresponding tab navigates or closes;
+- are cleared when the extension is disabled, reloaded, or updated, and when the browser restarts.
+
+The extension does not create an analytics profile or a persistent browsing-history database.
 
 ## User control
 
