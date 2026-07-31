@@ -26,27 +26,50 @@
       <div id="status" role="status" aria-live="polite"></div>
     </section>
 
-    <section class="section" aria-labelledby="articleContextHeading">
+    <section class="section article-section" aria-labelledby="articleContextHeading">
       <div class="section-heading-row"><div><h2 id="articleContextHeading">Article context</h2><p id="articleContextSummary" class="coverage-text">Scanning this page…</p></div><button id="rescan" type="button" class="text-button">Rescan</button></div>
       <div id="articleContext" class="context-card"><p class="placeholder">No article context detected yet.</p></div>
     </section>
 
-    <section class="section" aria-labelledby="integrityHeading">
-      <div class="section-heading-row"><div><h2 id="integrityHeading">Formal integrity signals</h2><p id="integrityCoverage" class="coverage-text">Integrity lookups are disabled.</p></div></div>
-      <div id="integrityProgressContainer" class="integrity-progress" hidden aria-live="polite">
-        <progress id="integrityProgress" max="100" value="0"></progress>
-        <span id="integrityProgressLabel">0 of 0 DOI records · 0%</span>
+    <section class="section overview-section" aria-labelledby="contextOverviewHeading">
+      <div class="section-heading-row">
+        <div><h2 id="contextOverviewHeading">Context overview</h2><p id="contextOverviewSummary" class="coverage-text">Scanning citation context…</p></div>
+        <span class="filter-hint">Select a card to filter</span>
       </div>
-      <div id="integrityStatusGrid" class="status-grid" aria-label="Integrity signal counts">
-        <div class="status-card status-retracted"><strong id="countRetracted">0</strong><span>Retracted</span></div>
-        <div class="status-card status-concern"><strong id="countConcern">0</strong><span>Concern</span></div>
-        <div class="status-card status-corrected"><strong id="countCorrected">0</strong><span>Corrected</span></div>
-        <div class="status-card status-withdrawn"><strong id="countWithdrawn">0</strong><span>Withdrawn</span></div>
+
+      <div id="contextScanState" class="scan-state" data-state="loading" aria-live="polite">
+        <span class="scan-spinner" aria-hidden="true"></span>
+        <span id="contextScanText">Scanning publisher profiles and citation links…</span>
       </div>
-      <p class="signal-disclaimer">No signal means only that none was found in checked sources—not that a work is safe or reliable.</p>
+
+      <div class="signal-group" aria-labelledby="publisherSignalsHeading">
+        <div class="signal-group-heading">
+          <h3 id="publisherSignalsHeading">Publisher watchlist</h3>
+          <span>Configured profiles</span>
+        </div>
+        <div id="publisherStatusGrid" class="signal-grid publisher-signal-grid" aria-label="Publisher profile match counts"></div>
+      </div>
+
+      <div class="signal-group" aria-labelledby="integrityHeading">
+        <div class="signal-group-heading">
+          <div><h3 id="integrityHeading">Formal integrity</h3><p id="integrityCoverage" class="coverage-text">Integrity lookups are disabled.</p></div>
+          <span>Crossref + Retraction Watch</span>
+        </div>
+        <div id="integrityProgressContainer" class="integrity-progress" hidden aria-live="polite">
+          <progress id="integrityProgress" max="100" value="0"></progress>
+          <span id="integrityProgressLabel">0 of 0 DOI records · 0%</span>
+        </div>
+        <div id="integrityStatusGrid" class="signal-grid formal-signal-grid" aria-label="Integrity signal counts">
+          <button type="button" class="signal-card status-card status-retracted" data-context-filter="status:retracted" aria-pressed="false"><strong id="countRetracted">0</strong><span>Retracted</span></button>
+          <button type="button" class="signal-card status-card status-concern" data-context-filter="status:expression-of-concern" aria-pressed="false"><strong id="countConcern">0</strong><span>Concern</span></button>
+          <button type="button" class="signal-card status-card status-corrected" data-context-filter="status:corrected" aria-pressed="false"><strong id="countCorrected">0</strong><span>Corrected</span></button>
+          <button type="button" class="signal-card status-card status-withdrawn" data-context-filter="status:withdrawn" aria-pressed="false"><strong id="countWithdrawn">0</strong><span>Withdrawn</span></button>
+        </div>
+      </div>
+      <p class="signal-disclaimer">A watchlist match is contextual, not a quality verdict. No formal signal means only that none was found in checked sources.</p>
     </section>
 
-    <section class="section" aria-labelledby="referencesHeading">
+    <section class="section results-section" aria-labelledby="referencesHeading">
       <div class="section-heading-row"><div><h2 id="referencesHeading">References and results</h2><p id="referencesSummary" class="coverage-text">Scanning publisher profiles and DOI updates…</p></div></div>
       <div class="context-controls" aria-label="Reference result controls">
         <label for="contextFilter"><span>Show</span><select id="contextFilter"><option value="all">All context</option></select></label>
@@ -55,22 +78,25 @@
       <ul id="contextList" class="context-list"><li class="placeholder">Loading context…</li></ul>
     </section>
 
-    <section class="report-section" aria-labelledby="reportHeading">
-      <h2 id="reportHeading">Report article/context issue</h2>
-      <select id="reportCategory" aria-label="Issue category">
-        <option value="publisher-not-detected">Publisher not detected</option>
-        <option value="wrong-publisher">Wrong publisher detected</option>
-        <option value="confidence-wrong">Confirmed or potential match is wrong</option>
-        <option value="missing-integrity">Missing retraction or correction</option>
-        <option value="wrong-integrity">Wrong integrity status</option>
-        <option value="layout-scroll">Page layout or scrolling problem</option>
-        <option value="suggest-profile">Suggest a publisher preset</option>
-      </select>
-      <button id="reportIssue" type="button" class="secondary">Open GitHub report</button>
-    </section>
+    <details class="report-section">
+      <summary id="reportHeading">Report an article/context issue</summary>
+      <div class="report-controls" aria-labelledby="reportHeading">
+        <select id="reportCategory" aria-label="Issue category">
+          <option value="publisher-not-detected">Publisher not detected</option>
+          <option value="wrong-publisher">Wrong publisher detected</option>
+          <option value="confidence-wrong">Confirmed or potential match is wrong</option>
+          <option value="missing-integrity">Missing retraction or correction</option>
+          <option value="wrong-integrity">Wrong integrity status</option>
+          <option value="layout-scroll">Page layout or scrolling problem</option>
+          <option value="suggest-profile">Suggest a publisher preset</option>
+        </select>
+        <button id="reportIssue" type="button" class="secondary">Open GitHub report</button>
+      </div>
+    </details>
   </main>
   <script src="shared/publisher_profiles.js"></script>
   <script src="popup.js"></script>
+  <script src="popup_overview.js"></script>
   <script src="popup_progress.js"></script>
   <script src="popup_recovery.js"></script>
 </body>
