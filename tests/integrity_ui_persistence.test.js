@@ -19,8 +19,8 @@ test('popup keeps status colors distinct and offers result controls', () => {
   assert.match(popup, /restorePersistedTabState/);
   assert.match(html, /id="contextFilter"/);
   assert.match(html, /id="contextSort"/);
-  assert.match(css, /\.chip\.integrity\{border-color:var\(--chip-color/);
-  assert.doesNotMatch(css, /\.chip\.integrity\{border-color:var\(--danger/);
+  assert.match(css, /\.chip\.integrity\s*\{[^}]*border-color:\s*var\(--chip-color/s);
+  assert.doesNotMatch(css, /\.chip\.integrity\s*\{[^}]*border-color:\s*var\(--danger/s);
   assert.match(css, /context-item-accented/);
 });
 
