@@ -47,6 +47,16 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.ok(manifest.content_scripts[0].js.includes('content/integrity_scanner.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/integrity_presentation.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/ncbi_fetch_proxy.js'));
+      assert.ok(manifest.content_scripts[0].js.includes('content/ncbi_context_bridge.js'));
+      assert.ok(manifest.content_scripts[0].js.includes('content/inline_context_reconciler.js'));
+      assert.ok(
+        manifest.content_scripts[0].js.indexOf('content/integrity_presentation.js') <
+        manifest.content_scripts[0].js.indexOf('content/ncbi_context_bridge.js')
+      );
+      assert.ok(
+        manifest.content_scripts[0].js.indexOf('content/ncbi_context_bridge.js') <
+        manifest.content_scripts[0].js.indexOf('content/inline_context_reconciler.js')
+      );
       assert.ok(manifest.content_scripts[0].css.includes('content/integrity_presentation.css'));
     }
 
@@ -81,6 +91,8 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_presentation.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_presentation.css')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'ncbi_fetch_proxy.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'ncbi_context_bridge.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'inline_context_reconciler.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'content_script.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'scripts')), false);
       assert.equal(fs.existsSync(path.join(DIST, target, 'tests')), false);
