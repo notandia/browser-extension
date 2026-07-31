@@ -106,3 +106,33 @@ test('NCBI-resolved publisher context uses the configured profile color and acti
   assert.match(bridge, /visual\.color/);
   assert.match(bridge, /visual\.action === 'highlight'/);
 });
+
+test('the NCBI bridge runs on article pages but not PubMed search pages', () => {
+  function run(hostname, pathname) {
+    const context = {
+      window: {},
+      location: { hostname, pathname }
+    };
+    vm.createContext(context);
+    vm.runInContext(source('content/ncbi_article_scope.js'), context);
+    return context.window;
+  }
+
+  assert.equal(run('pubmed.ncbi.nlm.nih.gov', '/33408014/').notandiaNcbiArticlePage, true);
+  assert.equal(run('pmc.ncbi.nlm.nih.gov', '/articles/PMC7779265/').notandiaNcbiArticlePage, true);
+  const searchPage = run('pubmed.ncbi.nlm.nih.gov', '/?term=coronavirus');
+  assert.equal(searchPage.notandiaNcbiArticlePage, false);
+  assert.equal(searchPage.notandiaNcbiContextBridgeInjected, true);
+});
+
+test('NCBI report priority unions richer publisher and integrity records', () => {
+  const priority = source('background_ncbi_priority.js');
+
+  assert.match(priority, /mergePublisherReports\(bestPublisherByTab\.get\(tabId\), incoming\)/);
+  assert.match(priority, /mergeMatches\(left\.matches, right\.matches\)/);
+  assert.match(priority, /bestIntegrityByTab\.set\(tabId, merged\)/);
+  assert.match(priority, /integrityFingerprint\(merged\) !== integrityFingerprint\(message\.data \|\| \{\}\)/);
+  assert.match(priority, /processIntegrityScan\(tabId, merged\)/);
+  assert.match(priority, /NotandiaBackgroundPersistence\?\.saveTab/);
+  assert.match(priority, /isNcbiArticleUrl\(sender\.url\)/);
+});

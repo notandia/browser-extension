@@ -232,13 +232,15 @@ test('all browser targets load publisher, integrity, and recovery runtimes safel
   assert.match(serviceWorker, /background\.js/);
   assert.match(serviceWorker, /background_persistence\.js/);
   assert.match(serviceWorker, /background_live_context\.js/);
+  assert.match(serviceWorker, /background_ncbi_priority\.js/);
   assert.deepEqual(firefox.background.scripts, [
     'shared/publisher_profiles.js',
     'shared/integrity.js',
     'background_support.js',
     'background.js',
     'background_persistence.js',
-    'background_live_context.js'
+    'background_live_context.js',
+    'background_ncbi_priority.js'
   ]);
   assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '140.0');
   assert.equal(firefox.browser_specific_settings.gecko_android.strict_min_version, '142.0');

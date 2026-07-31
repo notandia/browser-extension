@@ -47,6 +47,7 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.ok(manifest.content_scripts[0].js.includes('content/integrity_scanner.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/integrity_presentation.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/ncbi_fetch_proxy.js'));
+      assert.ok(manifest.content_scripts[0].js.includes('content/ncbi_article_scope.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/ncbi_context_bridge.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/inline_reference_mapper.js'));
       assert.ok(
@@ -56,6 +57,10 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.ok(
         manifest.content_scripts[0].js.indexOf('content/inline_reference_mapper.js') <
         manifest.content_scripts[0].js.indexOf('content/publisher_profile_scanner.js')
+      );
+      assert.ok(
+        manifest.content_scripts[0].js.indexOf('content/ncbi_article_scope.js') <
+        manifest.content_scripts[0].js.indexOf('content/ncbi_context_bridge.js')
       );
       assert.ok(manifest.content_scripts[0].css.includes('content/integrity_presentation.css'));
     }
@@ -68,7 +73,8 @@ test('one source tree generates isolated Notandia browser packages', () => {
       'background_support.js',
       'background.js',
       'background_persistence.js',
-      'background_live_context.js'
+      'background_live_context.js',
+      'background_ncbi_priority.js'
     ]);
     assert.equal(Object.hasOwn(firefox.background, 'service_worker'), false);
     assert.equal(Object.hasOwn(firefox.background, 'type'), false);
@@ -81,6 +87,7 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(fs.existsSync(path.join(DIST, target, 'background_support.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'background_persistence.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'background_live_context.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'background_ncbi_priority.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'service_worker.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'popup_progress.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'publisher_profiles.js')), true);
@@ -91,6 +98,7 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_presentation.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_presentation.css')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'ncbi_fetch_proxy.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'ncbi_article_scope.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'ncbi_context_bridge.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'inline_reference_mapper.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'content_script.js')), true);

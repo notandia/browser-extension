@@ -6,5 +6,6 @@ importScripts(
   'background_support.js',
   'background.js',
   'background_persistence.js',
-  'background_live_context.js'
+  'background_live_context.js',
+  'background_ncbi_priority.js'
 );
