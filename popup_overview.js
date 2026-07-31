@@ -6,7 +6,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const $ = id => document.getElementById(id);
   const el = {
+    heading: $('contextOverviewHeading'),
     summary: $('contextOverviewSummary'),
+    allCount: $('countAllContext'),
     scanState: $('contextScanState'),
     scanText: $('contextScanText'),
     publisherGrid: $('publisherStatusGrid'),
@@ -34,6 +36,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function rgba(hex, alpha) {
+    const match = /^#([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i.exec(String(hex || ''));
+    if (!match) return `rgba(72,98,122,${alpha})`;
+    return `rgba(${parseInt(match[1], 16)},${parseInt(match[2], 16)},${parseInt(match[3], 16)},${alpha})`;
+  }
+
   function keyFor(record, fallback) {
     const doi = String(record?.doi || '').trim().toLowerCase();
     return doi ? `doi:${doi}` : `${record?.kind || 'item'}:${record?.id || fallback}`;
@@ -44,10 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const publishers = new Set();
     const formal = new Set();
     const publisherRecords = [
-      publisherReport?.currentArticle,
       ...(publisherReport?.references || []),
       ...(publisherReport?.searchResults || [])
-    ].filter(Boolean);
+    ];
 
     for (const record of publisherRecords) {
       if (!(record.matches || []).length) continue;
@@ -56,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
       all.add(key);
     }
     for (const record of integrityReport?.records || []) {
-      if (!record?.primaryStatus) continue;
+      if (record?.kind === 'current-article' || !record?.primaryStatus) continue;
       const key = keyFor(record, `integrity-${formal.size + 1}`);
       formal.add(key);
       all.add(key);
@@ -78,67 +85,61 @@ document.addEventListener('DOMContentLoaded', () => {
     return counts;
   }
 
-  function createSignalCard({ filter, count, label, color, detail = '', zero = false, className = '' }) {
+  function createSignalCard({ filter, count, label, color }) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `signal-card ${className}`.trim();
+    button.className = 'signal-card publisher-signal-card';
     button.dataset.contextFilter = filter;
     button.setAttribute('aria-pressed', 'false');
-    button.title = `Filter reference results by ${label}`;
+    button.title = `Show ${label} references`;
     if (color) {
       button.style.setProperty('--signal-color', color);
-      button.style.setProperty('--signal-tint', `${color}0D`);
+      button.style.setProperty('--signal-tint', rgba(color, 0.07));
     }
-    if (zero) button.classList.add('is-zero');
 
-    const value = document.createElement('strong');
-    value.textContent = String(count);
     const text = document.createElement('span');
     text.textContent = label;
-    button.append(value, text);
-    if (detail) {
-      const small = document.createElement('small');
-      small.textContent = detail;
-      button.appendChild(small);
-    }
+    const value = document.createElement('strong');
+    value.textContent = String(count);
+    button.append(text, value);
     return button;
   }
 
   function renderPublisherCards() {
     const counts = profileCounts();
-    const profiles = (settings.profiles || []).filter(profile => profile.enabled);
+    const profiles = (settings.profiles || []).filter(profile => profile.enabled && (counts.get(profile.id) || 0) > 0);
     el.publisherGrid.replaceChildren();
 
-    const totalMatches = Array.from(counts.values()).reduce((sum, value) => sum + value, 0);
-    el.publisherGrid.appendChild(createSignalCard({
-      filter: 'publisher:any',
-      count: totalMatches,
-      label: 'All publishers',
-      color: '#48627A',
-      detail: 'Watchlist'
-    }));
-
     for (const profile of profiles) {
-      const count = counts.get(profile.id) || 0;
       el.publisherGrid.appendChild(createSignalCard({
         filter: `profile:${profile.id}`,
-        count,
+        count: counts.get(profile.id) || 0,
         label: profile.name,
-        color: profile.color,
-        detail: profile.action === 'none' ? 'Context' : profile.action,
-        zero: count === 0,
-        className: 'publisher-signal-card'
+        color: profile.color
       }));
     }
   }
 
   function renderSummary() {
-    if (!el.summary) return;
     const counts = allContextCounts();
-    const parts = [`${counts.total} contextual item${counts.total === 1 ? '' : 's'}`];
+    if (el.allCount) el.allCount.textContent = String(counts.total);
+
+    const stillScanning = scanState.publisherScanning === true || integrityReport?.state === 'loading' || scanState.integrityScanning === true;
+    if (el.heading) {
+      if (!counts.total && stillScanning) el.heading.textContent = 'Checking this page…';
+      else if (!counts.total) el.heading.textContent = 'No reference context found';
+      else el.heading.textContent = `${counts.total} reference${counts.total === 1 ? '' : 's'} with context`;
+    }
+
+    if (!el.summary) return;
+    const parts = [];
     if (counts.publishers) parts.push(`${counts.publishers} publisher match${counts.publishers === 1 ? '' : 'es'}`);
-    if (counts.formal) parts.push(`${counts.formal} formal signal${counts.formal === 1 ? '' : 's'}`);
-    el.summary.textContent = parts.join(' · ');
+    if (counts.formal) parts.push(`${counts.formal} work${counts.formal === 1 ? '' : 's'} with formal updates`);
+    el.summary.textContent = parts.length
+      ? parts.join(' · ')
+      : stillScanning
+        ? 'Looking for publisher matches and formal updates…'
+        : 'No watchlist matches or formal updates were found.';
   }
 
   function completedIntegrityRecords() {
@@ -166,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const attempted = Math.max(0, Math.trunc(Number(integrityReport?.attempted) || 0));
       const completed = Math.min(attempted, completedIntegrityRecords());
       el.scanText.textContent = attempted
-        ? `Publisher scan complete · checking formal updates ${completed}/${attempted}…`
+        ? `Checking formal updates ${completed}/${attempted}…`
         : 'Checking formal update records…';
     }
   }
@@ -177,11 +178,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const active = card.dataset.contextFilter === selected;
       card.classList.toggle('is-active', active);
       card.setAttribute('aria-pressed', String(active));
+
+      if (card.closest('#integrityStatusGrid')) {
+        const count = Number(card.querySelector('strong')?.textContent || 0);
+        card.hidden = count === 0 && !active;
+      }
     }
   }
 
   function activateFilter(filter) {
-    const next = el.filter.value === filter ? 'all' : filter;
+    const next = el.filter.value === filter && filter !== 'all' ? 'all' : filter;
     const optionExists = Array.from(el.filter.options).some(option => option.value === next);
     if (!optionExists) return;
     el.filter.value = next;
