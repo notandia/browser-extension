@@ -69,7 +69,9 @@
         "content/publisher_profile_scanner.js",
         "content/secure_message_handler.js",
         "content/integrity_scanner.js",
-        "content/integrity_presentation.js"
+        "content/integrity_presentation.js",
+        "content/ncbi_context_bridge.js",
+        "content/inline_context_reconciler.js"
       ],
       "run_at": "document_idle"
     }
