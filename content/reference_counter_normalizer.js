@@ -46,7 +46,11 @@
   }
 
   function visibleNumber(element) {
-    for (const attribute of ['data-counter', 'data-content', 'data-number', 'data-reference-number']) {
+    const counter = positiveNumber(element.getAttribute('data-counter'));
+    if (counter) return counter;
+    const dataContent = positiveNumber(element.getAttribute('data-content'));
+    if (dataContent) return dataContent;
+    for (const attribute of ['data-number', 'data-reference-number']) {
       const number = positiveNumber(element.getAttribute?.(attribute));
       if (number) return number;
     }
