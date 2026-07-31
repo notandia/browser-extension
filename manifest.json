@@ -54,6 +54,7 @@
         "content/link_extraction_selectors.js",
         "content/link_extractor.js",
         "content/inline_footnote_selectors.js",
+        "content/inline_reference_mapper.js",
         "content/inline_footnote_styler.js",
         "content/cited_by_selectors.js",
         "content/cited_by_styler.js",
@@ -70,8 +71,7 @@
         "content/secure_message_handler.js",
         "content/integrity_scanner.js",
         "content/integrity_presentation.js",
-        "content/ncbi_context_bridge.js",
-        "content/inline_context_reconciler.js"
+        "content/ncbi_context_bridge.js"
       ],
       "run_at": "document_idle"
     }
