@@ -71,6 +71,7 @@
         "content/secure_message_handler.js",
         "content/integrity_scanner.js",
         "content/integrity_presentation.js",
+        "content/ncbi_article_scope.js",
         "content/ncbi_context_bridge.js"
       ],
       "run_at": "document_idle"
