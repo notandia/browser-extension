@@ -36,6 +36,36 @@ test('popup presents one integrated clickable context overview', () => {
   assert.match(css, /\.scan-spinner/);
 });
 
+test('popup prioritizes reference context and hides diagnostic clutter', () => {
+  const html = source('popup.html');
+  const popup = source('popup.js');
+  const overview = source('popup_overview.js');
+  const css = source('popup.css');
+
+  assert.match(html, /id="articleContextSection"[^>]*hidden/);
+  assert.match(html, /class="filter-toolbar"/);
+  assert.match(html, /id="countAllContext"/);
+  assert.match(html, /<details class="coverage-details">/);
+  assert.match(html, /Formal updates are checked through Crossref and Retraction Watch/);
+  assert.doesNotMatch(html, /Configured profiles/);
+  assert.doesNotMatch(html, /Select a card to filter/);
+
+  assert.match(overview, /profile\.enabled && \(counts\.get\(profile\.id\) \|\| 0\) > 0/);
+  assert.match(overview, /reference\$\{counts\.total === 1 \? '' : 's'\} with context/);
+  assert.match(overview, /work\$\{counts\.formal === 1 \? '' : 's'\} with formal updates/);
+
+  assert.match(popup, /function cleanReferenceText\(/);
+  assert.match(popup, /PubMed Central/);
+  assert.match(popup, /chips\.appendChild\(chip\(match\.profileName, match\.color\)\)/);
+  assert.doesNotMatch(popup, /match\.profileName\} · \$\{match\.action/);
+  assert.match(popup, /el\.articleSection\.hidden = true/);
+  assert.match(popup, /not verified/);
+
+  assert.match(css, /\.signal-card\s*\{[\s\S]*border-radius: 999px/);
+  assert.match(css, /-webkit-line-clamp: 3/);
+  assert.match(css, /\.context-list\s*\{[\s\S]*overflow: hidden/);
+});
+
 test('publisher and integrity scans expose loading state without premature counts', () => {
   const manifest = JSON.parse(source('manifest.json'));
   const live = source('background_live_context.js');
