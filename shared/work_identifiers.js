@@ -145,7 +145,7 @@
     }
     const seenEvidence = new Set();
     identity.evidence = identity.evidence.filter(entry => {
-      const key = [entry.type, entry.value, entry.source, entry.method, entry.confidence].join('|');
+      const key = [entry.type, entry.value, entry.source, entry.method, entry.confidence, entry.version || ''].join('|');
       if (seenEvidence.has(key)) return false;
       seenEvidence.add(key);
       return true;
@@ -155,7 +155,7 @@
   }
 
   function addIdentifier(identity, type, value, options = {}) {
-    if (!IDENTIFIER_TYPES.includes(type) || !value) return false;
+    if (!IDENTIFIER_TYPES.includes(type) || value == null || value === '') return false;
     const normalizers = {
       doi: normalizeDOI,
       pmid: normalizePMID,
@@ -210,9 +210,7 @@
     parseUrl(text, identity, options);
 
     addIdentifier(identity, 'doi', text, { ...options, method: options.method || 'doi-value' });
-    addIdentifier(identity, 'pmid', text, { ...options, method: options.method || 'pmid-value' });
     addIdentifier(identity, 'pmcid', text, { ...options, method: options.method || 'pmcid-value' });
-    addIdentifier(identity, 'arxiv', text, { ...options, method: options.method || 'arxiv-value' });
 
     for (const found of text.matchAll(DOI_SEARCH)) {
       addIdentifier(identity, 'doi', found[0], { ...options, method: 'doi-text' });
@@ -228,17 +226,39 @@
     }
   }
 
-  function flattenValues(values) {
-    if (values == null) return [];
-    if (Array.isArray(values)) return values.flatMap(flattenValues);
-    if (values instanceof Set) return Array.from(values).flatMap(flattenValues);
-    if (typeof values === 'object') return Object.values(values).flatMap(flattenValues);
-    return [values];
+  function extractValues(values, identity, options = {}) {
+    if (values == null) return;
+    if (Array.isArray(values)) {
+      for (const value of values) extractValues(value, identity, options);
+      return;
+    }
+    if (values instanceof Set) {
+      for (const value of values) extractValues(value, identity, options);
+      return;
+    }
+    if (typeof values === 'object') {
+      for (const [rawKey, value] of Object.entries(values)) {
+        const key = String(rawKey).toLowerCase();
+        if (IDENTIFIER_TYPES.includes(key)) {
+          const structuredValues = Array.isArray(value) || value instanceof Set ? Array.from(value) : [value];
+          for (const candidate of structuredValues) {
+            addIdentifier(identity, key, candidate, {
+              ...options,
+              method: options.method || `structured-${key}`
+            });
+          }
+        } else {
+          extractValues(value, identity, options);
+        }
+      }
+      return;
+    }
+    extractOne(values, identity, options);
   }
 
   function extract(values, options = {}) {
     const identity = emptyIdentity();
-    for (const value of flattenValues(values)) extractOne(value, identity, options);
+    extractValues(values, identity, options);
     return finalize(identity);
   }
 
