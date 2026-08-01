@@ -19,6 +19,7 @@
 
   function isVisible(element) {
     if (!(element instanceof HTMLElement)) return false;
+    if (element.closest('[hidden],[aria-hidden="true"]')) return false;
     const style = getComputedStyle(element);
     return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
   }
@@ -89,6 +90,69 @@
     requestAnimationFrame(() => animateReference(reference, color));
   }
 
+  function controlTargetsId(control, id) {
+    return String(control.getAttribute?.('aria-controls') || '')
+      .trim()
+      .split(/\s+/)
+      .includes(id);
+  }
+
+  function collapsedControl(reference) {
+    const articleAccordionControl = reference.closest('div.article-accordion')
+      ?.querySelector('.accordion__control[aria-expanded="false"]');
+    if (articleAccordionControl instanceof HTMLElement) return articleAccordionControl;
+
+    const concealed = reference.closest('[hidden],[aria-hidden="true"]');
+    const controlledContainer = concealed?.closest('[id]') ||
+      reference.closest('[id][data-method="height"],[id][data-collapsible]');
+    const controlledId = String(controlledContainer?.id || '').trim();
+    if (!SAFE_REFERENCE_ID.test(controlledId)) return null;
+
+    for (const control of document.querySelectorAll('button[aria-controls],[role="button"][aria-controls]')) {
+      if (controlTargetsId(control, controlledId) && control instanceof HTMLElement) return control;
+    }
+    return null;
+  }
+
+  function waitForVisibleReference(message, timeout = 1800) {
+    return new Promise(resolve => {
+      const startedAt = Date.now();
+      const check = () => {
+        const reference = findReferenceElement(message);
+        if (reference && isVisible(reference)) {
+          resolve(reference);
+          return;
+        }
+        if (Date.now() - startedAt >= timeout) {
+          resolve(reference || null);
+          return;
+        }
+        setTimeout(check, 50);
+      };
+      check();
+    });
+  }
+
+  async function revealScrollAndAnimate(reference, message) {
+    if (isVisible(reference)) {
+      scrollAndAnimate(reference, message.color);
+      return 'scrolled';
+    }
+
+    const details = reference.closest('details:not([open])');
+    if (details instanceof HTMLDetailsElement) details.open = true;
+
+    const control = collapsedControl(reference);
+    if (control) control.click();
+
+    const revealed = await waitForVisibleReference(message);
+    if (revealed) {
+      scrollAndAnimate(revealed, message.color);
+      return isVisible(revealed) ? 'expanded-and-scrolled' : 'scrolled-hidden';
+    }
+    return 'not-found-after-expand';
+  }
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.id !== chrome.runtime.id || !message || typeof message !== 'object') return false;
     if (message.type !== 'scrollToRefOnPage') return false;
@@ -104,19 +168,9 @@
       return false;
     }
 
-    const collapsedControl = reference.closest('div.article-accordion')
-      ?.querySelector('.accordion__control[aria-expanded="false"]');
-    if (collapsedControl instanceof HTMLElement) {
-      collapsedControl.click();
-      setTimeout(() => {
-        scrollAndAnimate(reference, message.color);
-        sendResponse({ status: 'expanded-and-scrolled' });
-      }, 250);
-      return true;
-    }
-
-    scrollAndAnimate(reference, message.color);
-    sendResponse({ status: 'scrolled' });
-    return false;
+    void revealScrollAndAnimate(reference, message)
+      .then(status => sendResponse({ status }))
+      .catch(() => sendResponse({ status: 'scroll-failed' }));
+    return true;
   });
 })();
