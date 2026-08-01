@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 31 July 2026
+Last updated: 1 August 2026
 
 Notandia, previously distributed as MDPI Filter, identifies user-selected publisher context and can optionally check scholarly DOI identifiers for formal post-publication updates.
 
@@ -34,7 +34,18 @@ Crossref operates independently and its own privacy terms apply to requests it r
 
 ## NCBI metadata requests
 
-When enabled, NCBI lookups send only validated DOI, PMID, or PMCID identifiers. These requests help resolve publisher evidence when search results do not expose a direct DOI or publisher link. They omit browser credentials and referrer information.
+NCBI is an optional biomedical identifier resolver, not Notandia's primary identity system. NCBI lookups are disabled by default for new installations. When the user enables them, the extension sends only validated DOI, PMID, or PMCID identifiers to the documented PMC ID Converter endpoint. These requests help resolve identifier relationships when a page does not expose a direct DOI.
+
+NCBI requests:
+
+- omit browser credentials and referrer information;
+- contain the public application label `NotandiaBrowser`;
+- do not contain a personal NCBI username, personal maintainer address, or NCBI API key;
+- are deduplicated, cached in memory, limited to 50 identifiers per batch, and started no more than once per second;
+- stop during a cooldown after HTTP 403 or 429 responses and honor a valid `Retry-After` response;
+- treat provider failure as unavailable or throttled, not as evidence that an article has no matching identifier.
+
+A public extension package is inspectable. Notandia will not embed a personal address or private API credential in a browser release. A public project contact may be added only after it is created and registered with NCBI.
 
 ## Storage
 
@@ -55,7 +66,7 @@ The extension does not create an analytics profile or a persistent browsing-hist
 
 Users can independently disable MDPI, Frontiers, or any custom publisher profile and choose context-only, badge, highlight, dim, or hide behavior for each. They can add, remove, import, export, or reset profiles.
 
-Integrity and NCBI lookups can be enabled or disabled at any time. Disabling integrity lookups cancels active requests and prevents new DOI requests. Firefox also requires separate optional website-content consent before integrity requests begin.
+Integrity and NCBI lookups can be enabled or disabled at any time. Disabling integrity lookups cancels active requests and prevents new DOI requests. Disabling NCBI lookups prevents new PMC ID Converter requests. Firefox also requires separate optional website-content consent before integrity requests begin.
 
 ## Interpretation and limitations
 
