@@ -10,7 +10,6 @@ const root = path.resolve(__dirname, '..');
 const source = relativePath => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
 test('PNAS synthetic reference IDs map back to structured bibliography and inline citation IDs', () => {
-  const listeners = [];
   const citationContainer = { id: 'r14' };
   const reference = {
     getAttribute(name) {
@@ -45,22 +44,6 @@ test('PNAS synthetic reference IDs map back to structured bibliography and inlin
         return null;
       }
     },
-    chrome: {
-      runtime: {
-        id: 'extension-id',
-        onMessage: { addListener(listener) { listeners.push(listener); } }
-      }
-    },
-    HTMLElement: class HTMLElement {},
-    HTMLDetailsElement: class HTMLDetailsElement {},
-    getComputedStyle() {
-      return { display: 'block', visibility: 'visible' };
-    },
-    requestAnimationFrame(callback) {
-      callback();
-    },
-    setTimeout,
-    clearTimeout,
     console
   };
   context.window.window = context.window;
@@ -74,18 +57,20 @@ test('PNAS synthetic reference IDs map back to structured bibliography and inlin
   assert.match(selectors, /a\[data-xml-rid="r14"\]/);
   assert.match(selectors, /href="#core-collateral-r14"/);
   assert.match(selectors, /id\^="core-r14-"/);
-  assert.equal(listeners.length, 1);
 });
 
-test('PNAS compatibility reveals hidden bibliography items before replaying the scroll animation', () => {
-  const compatibility = source('content/pnas_reference_compatibility.js');
+test('collapsed bibliography items are revealed before replaying the scroll animation', () => {
+  const handler = source('content/secure_message_handler.js');
 
-  assert.match(compatibility, /reference\.closest\('\[hidden\]'\)/);
-  assert.match(compatibility, /button\[aria-controls\]/);
-  assert.match(compatibility, /control\.click\(\)/);
-  assert.match(compatibility, /waitForVisibleReference/);
-  assert.match(compatibility, /scrollIntoView\(\{ behavior: 'smooth', block: 'center' \}\)/);
-  assert.match(compatibility, /notandia-scroll-target/);
+  assert.match(handler, /reference\.closest\('\[hidden\],\[aria-hidden="true"\]'\)/);
+  assert.match(handler, /button\[aria-controls\]/);
+  assert.match(handler, /controlTargetsId/);
+  assert.match(handler, /control\.click\(\)/);
+  assert.match(handler, /details:not\(\[open\]\)/);
+  assert.match(handler, /waitForVisibleReference/);
+  assert.match(handler, /scrollIntoView\(\{ behavior: 'smooth', block: 'center' \}\)/);
+  assert.match(handler, /notandia-scroll-target/);
+  assert.match(handler, /return true;/);
 });
 
 test('PNAS compatibility loads after the shared integrity presentation', () => {
