@@ -57,6 +57,23 @@ test('extracts exact identifiers without treating arbitrary numbers as PMIDs', (
   assert.ok(identity.evidence.every(entry => entry.source === 'test-fixture'));
 });
 
+test('requires an explicit type before a bare numeric value becomes a PMID', () => {
+  const mapper = loadMapper();
+  const ambiguous = mapper.extract('33408014', {
+    source: 'page-text',
+    method: 'unstructured-text'
+  });
+  assert.deepEqual(Array.from(ambiguous.identifiers.pmid), []);
+  assert.equal(ambiguous.canonicalKey, null);
+
+  const structured = mapper.extract({ year: 2020, pmid: '33408014' }, {
+    source: 'structured-metadata'
+  });
+  assert.deepEqual(Array.from(structured.identifiers.pmid), ['33408014']);
+  assert.deepEqual(Array.from(structured.identifiers.arxiv), []);
+  assert.equal(structured.canonicalKey, 'pmid:33408014');
+});
+
 test('merges identities deterministically and preserves provider provenance', () => {
   const mapper = loadMapper();
   const local = mapper.extract('PMID: 14699080', {
