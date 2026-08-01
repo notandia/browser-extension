@@ -9,9 +9,10 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const source = relativePath => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-test('PNAS synthetic reference IDs map back to structured bibliography and inline citation IDs', () => {
+test('structured ancestor IDs map synthetic references to data-xml-rid citations', () => {
   const citationContainer = { id: 'r14' };
   const reference = {
+    id: '',
     getAttribute(name) {
       return name === 'data-mdpi-filter-ref-id' ? 'notandia-reference-14' : null;
     },
@@ -24,17 +25,7 @@ test('PNAS synthetic reference IDs map back to structured bibliography and inlin
     }
   };
   const context = {
-    window: {
-      MDPIFilterUtils: {
-        generateInlineFootnoteSelectors(referenceId) {
-          return `base:${referenceId}`;
-        },
-        resolveInlineReferenceTarget(referenceId) {
-          return `fallback:${referenceId}`;
-        }
-      }
-    },
-    location: { hostname: 'www.pnas.org', pathname: '/doi/full/10.1073/pnas.1212247109' },
+    window: {},
     document: {
       querySelectorAll(selector) {
         if (selector === '[data-mdpi-filter-ref-id]') return [reference];
@@ -48,15 +39,26 @@ test('PNAS synthetic reference IDs map back to structured bibliography and inlin
   };
   context.window.window = context.window;
   vm.createContext(context);
-  vm.runInContext(source('content/pnas_reference_compatibility.js'), context);
+  vm.runInContext(source('content/inline_footnote_selectors.js'), context);
+  vm.runInContext(source('content/inline_reference_mapper.js'), context);
 
   const utils = context.window.MDPIFilterUtils;
   assert.equal(utils.resolveInlineReferenceTarget('notandia-reference-14'), 'r14');
   const selectors = utils.generateInlineFootnoteSelectors('notandia-reference-14');
-  assert.match(selectors, /base:r14/);
   assert.match(selectors, /a\[data-xml-rid="r14"\]/);
   assert.match(selectors, /href="#core-collateral-r14"/);
   assert.match(selectors, /id\^="core-r14-"/);
+});
+
+test('shared mapper keeps structured ancestor recovery available beyond one hostname', () => {
+  const mapper = source('content/inline_reference_mapper.js');
+  const selectors = source('content/inline_footnote_selectors.js');
+
+  assert.match(mapper, /element\.closest\?\.\('\.citations\[id\]'\)\?\.id/);
+  assert.match(mapper, /\[role="listitem"\]/);
+  assert.match(selectors, /data-xml-rid/);
+  assert.match(selectors, /core-collateral-/);
+  assert.doesNotMatch(source('manifest.json'), /pnas_reference_compatibility/);
 });
 
 test('collapsed bibliography items are revealed before replaying the scroll animation', () => {
@@ -71,14 +73,4 @@ test('collapsed bibliography items are revealed before replaying the scroll anim
   assert.match(handler, /scrollIntoView\(\{ behavior: 'smooth', block: 'center' \}\)/);
   assert.match(handler, /notandia-scroll-target/);
   assert.match(handler, /return true;/);
-});
-
-test('PNAS compatibility loads after the shared integrity presentation', () => {
-  const manifest = JSON.parse(source('manifest.json'));
-  const scripts = manifest.content_scripts[0].js;
-  const compatibilityIndex = scripts.indexOf('content/pnas_reference_compatibility.js');
-
-  assert.ok(compatibilityIndex > scripts.indexOf('content/inline_reference_mapper.js'));
-  assert.ok(compatibilityIndex > scripts.indexOf('content/integrity_presentation.js'));
-  assert.ok(compatibilityIndex > scripts.indexOf('content/site_reference_compatibility.js'));
 });
