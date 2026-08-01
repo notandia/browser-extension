@@ -43,6 +43,7 @@
         "content/site_reference_compatibility.css"
       ],
       "js": [
+        "shared/work_identifiers.js",
         "shared/publisher_profiles.js",
         "content/runtime_guard.js",
         "content/publisher_scan_indicator.js",
