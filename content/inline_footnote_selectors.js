@@ -36,15 +36,20 @@
       `a[href="#en${withoutEn}"]`,
       `a[data-rid="${refId}"]`,
       `a[data-bris-rid="${refId}"]`,
+      `a[data-xml-rid="${refId}"]`,
       `a[rid="${refId}"]`,
       `a[data-test="citation-ref"][href$="#ref-${refId}"]`,
       `a[id="body-ref-${refId}"]`,
+      `a[id^="core-${refId}-"]`,
       `a[aria-controls="${refId}"]`,
       `a[data-db-target-for="${refId}"]`,
       `a.link-ref.xref-bibr[reveal-id="${refId}"]`,
       `a.link-ref.xref-bibr[data-open="${refId}"]`,
       `a[href="#${withoutScienceDirectPrefix}"]`,
+      `a[href="#core-collateral-${refId}"]`,
       `a[role="doc-biblioref"][href="#${refId}"]`,
+      `a[role="doc-biblioref"][data-xml-rid="${refId}"]`,
+      `a[role="doc-biblioref"][href="#core-collateral-${refId}"]`,
       `a.ejp-citation-link[data-reference-links="${refId}"]`
     ];
 
@@ -60,15 +65,20 @@
       `sup[id="ref${refId}"]`,
       `sup a[data-rid="${refId}"]`,
       `sup a[data-bris-rid="${refId}"]`,
+      `sup a[data-xml-rid="${refId}"]`,
       `sup a[rid="${refId}"]`,
       `sup a[data-test="citation-ref"][href$="#ref-${refId}"]`,
       `sup a[id="body-ref-${refId}"]`,
+      `sup a[id^="core-${refId}-"]`,
       `sup a[aria-controls="${refId}"]`,
       `sup a[data-db-target-for="${refId}"]`,
       `sup a.link-ref.xref-bibr[reveal-id="${refId}"]`,
       `sup a.link-ref.xref-bibr[data-open="${refId}"]`,
       `sup a[href="#${withoutScienceDirectPrefix}"]`,
+      `sup a[href="#core-collateral-${refId}"]`,
       `sup a[role="doc-biblioref"][href="#${refId}"]`,
+      `sup a[role="doc-biblioref"][data-xml-rid="${refId}"]`,
+      `sup a[role="doc-biblioref"][href="#core-collateral-${refId}"]`,
       `sup a.ejp-citation-link[data-reference-links="${refId}"]`
     ];
 
