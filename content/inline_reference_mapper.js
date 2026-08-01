@@ -29,6 +29,15 @@
     return byId?.closest?.('li,[role="listitem"],div.reference,div.ref-cit-blk') || byId || null;
   }
 
+  function structuredAncestorIds(element) {
+    return [
+      element.closest?.('.citations[id]')?.id,
+      element.closest?.('[role="listitem"]')?.querySelector?.('.citations[id]')?.id,
+      element.closest?.('[role="listitem"][id]')?.id,
+      element.closest?.('li[id]')?.id
+    ];
+  }
+
   function actualTargetId(referenceId) {
     const normalizedFallback = normalizeReferenceId(referenceId);
     if (!normalizedFallback) return null;
@@ -41,6 +50,7 @@
       element.querySelector?.('span.label a.anchor[id^="ref-id-b"]')?.id,
       element.querySelector?.('span.reference[id^="rf"]')?.id,
       element.querySelector?.('a.rev-xref-ref[id^="ref-"]')?.id,
+      ...structuredAncestorIds(element),
       element.id,
       element.getAttribute?.('content-id'),
       element.getAttribute?.('data-legacy-id'),
