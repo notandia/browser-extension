@@ -39,7 +39,8 @@
         "https://*/*"
       ],
       "css": [
-        "content/integrity_presentation.css"
+        "content/integrity_presentation.css",
+        "content/site_reference_compatibility.css"
       ],
       "js": [
         "shared/publisher_profiles.js",
@@ -71,6 +72,7 @@
         "content/secure_message_handler.js",
         "content/integrity_scanner.js",
         "content/integrity_presentation.js",
+        "content/site_reference_compatibility.js",
         "content/ncbi_article_scope.js",
         "content/ncbi_context_bridge.js"
       ],

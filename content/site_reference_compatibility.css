@@ -1,0 +1,42 @@
+/* Site-specific presentation corrections for reference-list structures. */
+
+/* PubMed renders the visible citation inside a nested list item. Keep the
+   structural outer item for navigation/reporting, but place the visual signal
+   around the actual citation content and link its list number by color. */
+#top-references-list .references-list > li.notandia-integrity-reference {
+  border-left: 0 !important;
+  padding-left: 0 !important;
+  background-color: transparent !important;
+}
+
+#top-references-list .references-list > li.notandia-integrity-reference::marker {
+  color: var(--notandia-integrity-color, #B42318) !important;
+  font-weight: 800 !important;
+}
+
+#top-references-list
+  .references-list
+  > li.notandia-integrity-reference
+  > ol.references-and-notes-list
+  > li.notandia-pubmed-integrity-content {
+  box-sizing: border-box !important;
+  border-left: 4px solid var(--notandia-integrity-color, #B42318) !important;
+  padding: 8px !important;
+  background-color: var(--notandia-integrity-tint, rgba(180, 35, 24, 0.08)) !important;
+}
+
+#top-references-list
+  .references-list
+  > li.notandia-integrity-reference
+  > ol.references-and-notes-list
+  > li.notandia-pubmed-integrity-content
+  > .notandia-integrity-chip {
+  margin: 8px 0 0 !important;
+}
+
+/* Wikipedia uses stable cite_note/cite_ref pairs. Make a flagged bibliography
+   number visually belong to the same status as the highlighted citation. */
+li[id^="cite_note-"].notandia-integrity-reference::marker {
+  color: var(--notandia-integrity-color, #B42318) !important;
+  font-weight: 800 !important;
+}
