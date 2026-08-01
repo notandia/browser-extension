@@ -8,11 +8,9 @@
   if (!['pubmed.ncbi.nlm.nih.gov', 'pmc.ncbi.nlm.nih.gov'].includes(hostname)) return;
 
   const api = window.NotandiaPublisherProfiles;
-  if (!api) return;
+  const workIdentifiers = window.NotandiaWorkIdentifiers;
+  if (!api || !workIdentifiers) return;
 
-  const DOI_PATTERN = /\b10\.\d{4,9}\/[A-Z0-9._;()/:+-]+/gi;
-  const PMID_PATTERN = /(?:list_uids=|\/pubmed\/|pubmed\.ncbi\.nlm\.nih\.gov\/)(\d{1,12})(?:\D|$)/i;
-  const PMCID_PATTERN = /(?:\/pmc\/articles\/|pmc\.ncbi\.nlm\.nih\.gov\/(?:articles\/)?|\/articles\/)(PMC\d{1,12})(?:\D|$)/i;
   const SAFE_REFERENCE_ID = /^[A-Za-z0-9_.:-]{1,256}$/;
   const MAX_REFERENCES = 250;
   const MAX_IDS_PER_TYPE = 200;
@@ -22,35 +20,17 @@
   let lastFingerprint = '';
   let runGeneration = 0;
 
-  function normalizeDoi(value) {
-    let normalized = String(value || '').trim();
-    try { normalized = decodeURIComponent(normalized); } catch {}
-    normalized = normalized
-      .replace(/^doi\s*:\s*/i, '')
-      .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '')
-      .replace(/[\s\u00A0]+/g, '')
-      .replace(/[),.;:\]}>'"`]+$/g, '')
-      .toLowerCase();
-    return /^10\.\d{4,9}\/[\w.()/:;+-]+$/i.test(normalized) ? normalized : null;
-  }
+  const normalizeDoi = workIdentifiers.normalizeDOI;
+  const normalizePmid = workIdentifiers.normalizePMID;
+  const normalizePmcid = workIdentifiers.normalizePMCID;
 
-  function addDoi(set, value) {
-    const direct = normalizeDoi(value);
-    if (direct) set.add(direct);
-    for (const match of String(value || '').matchAll(DOI_PATTERN)) {
-      const doi = normalizeDoi(match[0]);
-      if (doi) set.add(doi);
-    }
-  }
-
-  function normalizePmid(value) {
-    const normalized = String(value || '').trim();
-    return /^\d{1,12}$/.test(normalized) ? normalized : null;
-  }
-
-  function normalizePmcid(value) {
-    const normalized = String(value || '').trim().toUpperCase();
-    return /^PMC\d{1,12}$/.test(normalized) ? normalized : null;
+  function addDoi(set, value, method = 'ncbi-page-value') {
+    const identity = workIdentifiers.extract(value, {
+      source: hostname,
+      method,
+      confidence: 'exact'
+    });
+    for (const doi of identity.identifiers.doi) set.add(doi);
   }
 
   function addHostname(set, value) {
@@ -60,59 +40,41 @@
     } catch {}
   }
 
-  function identifiersFromValue(value, output) {
-    const text = String(value || '');
-    const pmid = normalizePmid(text.match(PMID_PATTERN)?.[1]);
-    const pmcid = normalizePmcid(text.match(PMCID_PATTERN)?.[1]);
-    if (pmid) output.pmids.add(pmid);
-    if (pmcid) output.pmcids.add(pmcid);
-
-    for (const found of text.matchAll(/\bPMC\d{1,12}\b/gi)) {
-      const normalized = normalizePmcid(found[0]);
-      if (normalized) output.pmcids.add(normalized);
-    }
+  function identifiersFromValue(value, output, method = 'ncbi-page-value') {
+    const identity = workIdentifiers.extract(value, {
+      source: hostname,
+      method,
+      confidence: 'exact'
+    });
+    for (const pmid of identity.identifiers.pmid) output.pmids.add(pmid);
+    for (const pmcid of identity.identifiers.pmcid) output.pmcids.add(pmcid);
   }
 
   function identifiersFromElement(element) {
     const output = { pmids: new Set(), pmcids: new Set() };
-    identifiersFromValue(element.textContent || '', output);
+    identifiersFromValue(element.textContent || '', output, 'reference-text');
     for (const link of element.querySelectorAll?.('a[href]') || []) {
-      const raw = link.getAttribute('href') || '';
-      identifiersFromValue(raw, output);
-      try {
-        const url = new URL(raw, document.baseURI);
-        if (url.hostname.replace(/^www\./, '') === 'pubmed.ncbi.nlm.nih.gov') {
-          const pmid = normalizePmid(url.pathname.match(/^\/(\d{1,12})\/?/)?.[1]);
-          if (pmid) output.pmids.add(pmid);
-        }
-      } catch {}
+      identifiersFromValue(link.getAttribute('href') || '', output, 'reference-link');
     }
     return output;
   }
 
   function pageIdentifiers() {
     const output = { pmids: new Set(), pmcids: new Set() };
-    if (hostname === 'pubmed.ncbi.nlm.nih.gov') {
-      const pmid = normalizePmid(location.pathname.match(/^\/(\d{1,12})\/?/)?.[1]);
-      if (pmid) output.pmids.add(pmid);
-    }
-    if (hostname === 'pmc.ncbi.nlm.nih.gov') {
-      const pmcid = normalizePmcid(location.pathname.match(/^\/articles\/(PMC\d{1,12})\/?/i)?.[1]);
-      if (pmcid) output.pmcids.add(pmcid);
-    }
+    identifiersFromValue(location.href, output, 'article-url');
     return output;
   }
 
   function directDoiFromElement(element) {
     const dois = new Set();
     for (const attribute of ['data-doi', 'data-article-doi', 'data-reference-doi']) {
-      addDoi(dois, element.getAttribute?.(attribute) || '');
+      addDoi(dois, element.getAttribute?.(attribute) || '', 'reference-attribute');
     }
     for (const link of element.querySelectorAll?.('a[href]') || []) {
-      addDoi(dois, link.getAttribute('href') || '');
-      addDoi(dois, link.getAttribute('data-doi') || '');
+      addDoi(dois, link.getAttribute('href') || '', 'reference-link');
+      addDoi(dois, link.getAttribute('data-doi') || '', 'reference-link-attribute');
     }
-    addDoi(dois, element.textContent || '');
+    addDoi(dois, element.textContent || '', 'reference-text');
     return Array.from(dois)[0] || null;
   }
 
@@ -230,29 +192,23 @@
   }
 
   function resolutionMaps(records) {
-    const pmids = new Map();
-    const pmcids = new Map();
-    for (const record of records || []) {
-      for (const candidate of [record, ...(Array.isArray(record?.versions) ? record.versions : [])]) {
-        const doi = normalizeDoi(candidate?.doi || '');
-        if (!doi) continue;
-        const pmid = normalizePmid(candidate?.pmid);
-        const pmcid = normalizePmcid(candidate?.pmcid);
-        if (pmid) pmids.set(pmid, doi);
-        if (pmcid) pmcids.set(pmcid, doi);
-      }
-    }
-    return { pmids, pmcids };
+    const shared = workIdentifiers.resolutionMapsFromNCBI(records);
+    return { pmids: shared.pmidToDoi, pmcids: shared.pmcidToDoi };
   }
 
   function resolvedDoi(identifiers, maps) {
-    for (const pmid of identifiers.pmids) {
-      if (maps.pmids.has(pmid)) return maps.pmids.get(pmid);
-    }
-    for (const pmcid of identifiers.pmcids) {
-      if (maps.pmcids.has(pmcid)) return maps.pmcids.get(pmcid);
-    }
-    return null;
+    const identity = workIdentifiers.extract({
+      pmid: Array.from(identifiers.pmids || []),
+      pmcid: Array.from(identifiers.pmcids || [])
+    }, {
+      source: hostname,
+      method: 'ncbi-identifier-set',
+      confidence: 'exact'
+    });
+    return workIdentifiers.resolvedDOI(identity, {
+      pmidToDoi: maps.pmids,
+      pmcidToDoi: maps.pmcids
+    });
   }
 
   function clearBridgeVisuals() {
