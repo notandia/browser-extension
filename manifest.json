@@ -73,7 +73,6 @@
         "content/integrity_scanner.js",
         "content/integrity_presentation.js",
         "content/site_reference_compatibility.js",
-        "content/pnas_reference_compatibility.js",
         "content/ncbi_article_scope.js",
         "content/ncbi_context_bridge.js"
       ],
