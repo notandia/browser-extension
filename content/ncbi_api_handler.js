@@ -1,7 +1,7 @@
 'use strict';
 
 (() => {
-  if (window.MDPIFilterNcbiApiHandler) return;
+  if (window.NotandiaNcbiApiHandler) return;
 
   const MDPI_DOI_PREFIX = '10.3390/';
   const BATCH_SIZE = 50;
@@ -9,6 +9,10 @@
   const MAX_CACHE_ENTRIES = 1000;
 
   let remainingLookupBudget = MAX_IDS_PER_PAGE;
+
+  function notandiaSettings() {
+    return window.NotandiaSettings || window.MDPIFilterSettings || {};
+  }
 
   function normalizeId(id, idType) {
     if (typeof id !== 'string' && typeof id !== 'number') return null;
@@ -81,7 +85,7 @@
 
   function sendProviderBatch(batch, idType) {
     return new Promise(resolve => {
-      if (window.MDPIFilterSettings?.ncbiApiEnabled !== true) {
+      if (notandiaSettings().ncbiApiEnabled !== true) {
         resolve({ status: 'disabled', records: [], retryAfterMs: 0 });
         return;
       }
@@ -108,7 +112,7 @@
   }
 
   async function requestProviderRecords(ids, idType) {
-    if (window.MDPIFilterSettings?.ncbiApiEnabled !== true) {
+    if (notandiaSettings().ncbiApiEnabled !== true) {
       return { status: 'disabled', records: [], retryAfterMs: 0 };
     }
     const normalized = normalizeIdsForQuery(ids, idType);
@@ -162,7 +166,7 @@
   }
 
   async function checkNcbiIdsForMdpi(ids, idType, runCache, ncbiApiCache) {
-    if (window.MDPIFilterSettings?.ncbiApiEnabled !== true) return false;
+    if (notandiaSettings().ncbiApiEnabled !== true) return false;
     if (!(runCache instanceof Map) || !(ncbiApiCache instanceof Map)) return false;
     if (!['pmid', 'pmcid', 'doi'].includes(idType) || !Array.isArray(ids)) return false;
 
@@ -220,10 +224,14 @@
     return normalizedIds.some(id => runCache.get(id) === true);
   }
 
-  window.MDPIFilterNcbiApiHandler = {
+  const handler = Object.freeze({
     checkNcbiIdsForMdpi,
     normalizeIdsForQuery,
     requestProviderRecords,
     resolveNcbiIdsToDois
-  };
+  });
+
+  window.NotandiaNcbiApiHandler = handler;
+  // Legacy compatibility alias for already-released runtime code.
+  window.MDPIFilterNcbiApiHandler = handler;
 })();
