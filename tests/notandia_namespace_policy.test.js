@@ -16,4 +16,6 @@ test('runtime namespace policy distinguishes product rebrand from MDPI publisher
   assert.match(policy, /new code must prefer the Notandia name/);
   assert.match(policy, /legacy name only as an explicit fallback or alias/);
   assert.match(policy, /previously distributed as \*\*MDPI Filter\*\*/);
+  assert.match(policy, /data-notandia-doi/);
+  assert.match(policy, /publisher matching and formal-integrity scanning consume the same search selectors/);
 });
