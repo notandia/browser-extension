@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 1 August 2026
+Last updated: 9 August 2026
 
 Notandia, previously distributed as MDPI Filter, identifies user-selected publisher context and can optionally check scholarly DOI identifiers for formal post-publication updates.
 
@@ -36,16 +36,20 @@ Crossref operates independently and its own privacy terms apply to requests it r
 
 NCBI is an optional biomedical identifier resolver, not Notandia's primary identity system. NCBI lookups are disabled by default for new installations. When the user enables them, the extension sends only validated DOI, PMID, or PMCID identifiers to the documented PMC ID Converter endpoint. These requests help resolve identifier relationships when a page does not expose a direct DOI.
 
+The PMC Help Desk requests that programmatic clients identify themselves with `tool` and `email` parameters. Notandia therefore sends the public application label `NotandiaBrowser` and the public maintainer contact `mario.marcolongo.dev@gmail.com` with each PMC ID Converter request. This address identifies the Notandia client, not the extension user, and is not a secret credential.
+
 NCBI requests:
 
 - omit browser credentials and referrer information;
-- contain the public application label `NotandiaBrowser`;
-- do not contain a personal NCBI username, personal maintainer address, or NCBI API key;
-- are deduplicated, cached in memory, limited to 50 identifiers per batch, and started no more than once per second;
+- contain only validated scholarly identifiers plus the provider-required public `tool` and maintainer `email` parameters;
+- do not contain an NCBI username, end-user account identifier, analytics identifier, or NCBI API key;
+- are deduplicated, cached in memory, and limited to 50 identifiers per batch;
+- are globally serialized so only one request is in flight at a time;
+- are started no more than approximately once per second, which is stricter than NCBI's stated maximum of three requests per second;
 - stop during a cooldown after HTTP 403 or 429 responses and honor a valid `Retry-After` response;
 - treat provider failure as unavailable or throttled, not as evidence that an article has no matching identifier.
 
-A public extension package is inspectable. Notandia will not embed a personal address or private API credential in a browser release. A public project contact may be added only after it is created and registered with NCBI.
+A public extension package is inspectable. Notandia does not embed a private API credential in a browser release.
 
 ## Storage
 
