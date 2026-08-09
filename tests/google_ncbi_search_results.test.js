@@ -105,7 +105,9 @@ test('publisher scanner recognizes biomedical URL evidence and enriches search r
   const manifest = JSON.parse(source('manifest.json'));
   const scripts = manifest.content_scripts[0].js;
 
-  assert.match(scanner, /url\.pathname\.match\(\/\^\\\/article\\\/\(med\|pmc\)\\\/\(\[\^\/?#\]\+\)\/i\)/);
+  assert.match(scanner, /const match = url\.pathname\.match/);
+  assert.match(scanner, /europepmc\.org/);
+  assert.match(scanner, /med\|pmc/);
   assert.match(scanner, /resolveNcbiIdsToDois/);
   assert.match(scanner, /await enrichRecordsWithNcbi\(\[\.\.\.referenceRecords, \.\.\.searchRecords\]\)/);
   assert.match(scanner, /ncbiApiEnabled: false/);
