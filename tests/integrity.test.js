@@ -151,7 +151,7 @@ test('integrity runtime restores reports before falling back to a rescan', () =>
 
   assert.match(scanner, /getAttribute\?\.\('data-counter'\)/);
   assert.match(scanner, /referenceNumber\(element, index\)/);
-  assert.match(scanner, /references\.map\(reference => \[reference\.id, reference\.doi\]\)/);
+  assert.match(scanner, /records\.map\(record => \[record\.id, record\.kind, record\.number, record\.doi\]\)/);
   assert.match(scanner, /sendResponse\(\{ scheduled: true \}\)/);
 
   assert.match(presentation, /generateInlineFootnoteSelectors/);
@@ -226,7 +226,9 @@ test('all browser targets load publisher, integrity, and recovery runtimes safel
   assert.ok(scripts.includes('content/integrity_scanner.js'));
   assert.ok(scripts.includes('content/integrity_presentation.js'));
   assert.ok(scripts.indexOf('content/reference_counter_normalizer.js') < scripts.indexOf('content/publisher_profile_scanner.js'));
-  assert.ok(scripts.indexOf('content/ncbi_fetch_proxy.js') < scripts.indexOf('content/ncbi_api_handler.js'));
+  assert.equal(scripts.includes('content/ncbi_fetch_proxy.js'), false);
+  assert.ok(scripts.indexOf('content/ncbi_api_handler.js') < scripts.indexOf('content/publisher_profile_scanner.js'));
+  assert.ok(scripts.indexOf('content/ncbi_api_handler.js') < scripts.indexOf('content/integrity_scanner.js'));
   assert.ok(manifest.content_scripts[0].css.includes('content/integrity_presentation.css'));
   assert.match(serviceWorker, /background_support\.js/);
   assert.match(serviceWorker, /background\.js/);
