@@ -8,7 +8,7 @@ const test = require('node:test');
 const root = path.resolve(__dirname, '..');
 const source = relativePath => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-test('one publisher scanner owns article detection and presentation', () => {
+test('one publisher scanner owns publisher detection and presentation', () => {
   const manifest = JSON.parse(source('manifest.json'));
   const scripts = manifest.content_scripts[0].js;
   const scanner = source('content/publisher_profile_scanner.js');
@@ -26,7 +26,8 @@ test('one publisher scanner owns article detection and presentation', () => {
   assert.match(scanner, /generateInlineFootnoteSelectors/);
   assert.match(scanner, /notandia-publisher-citation/);
   assert.match(scanner, /c-reading-companion/);
-  assert.match(scanner, /nodeTouchesReferences/);
+  assert.match(scanner, /nodeTouchesRelevantContent/);
+  assert.match(scanner, /configuredSearchSelector/);
   assert.match(counter, /getAttribute\('data-content'\)/);
   assert.match(counter, /setAttribute\('data-counter'/);
   assert.match(css, /html body \.notandia-publisher-badge/);
