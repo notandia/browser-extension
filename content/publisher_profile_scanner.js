@@ -14,6 +14,8 @@
   const MAX_TEXT = 500;
   const STYLE_ATTRIBUTE = 'data-notandia-profile-style';
   const SIGNATURE_ATTRIBUTE = 'data-notandia-profile-signature';
+  const REFERENCE_ID_ATTRIBUTE = 'data-notandia-ref-id';
+  const LEGACY_REFERENCE_ID_ATTRIBUTE = 'data-mdpi-filter-ref-id';
   const INLINE_ACTION_ATTRIBUTE = 'data-notandia-publisher-action';
   const INLINE_PROFILE_ATTRIBUTE = 'data-notandia-publisher-profile';
   const STYLE_PROPERTIES = Object.freeze(['display', 'opacity', 'border-left', 'padding-left', 'background-color']);
@@ -117,10 +119,17 @@
   }
 
   function safeRecordId(element, index, kind) {
-    const existing = element.dataset?.mdpiFilterRefId || element.id || element.getAttribute?.('data-bib-id') || element.getAttribute?.('data-reference-id');
+    const existing = element.dataset?.notandiaRefId ||
+      element.dataset?.mdpiFilterRefId ||
+      element.id ||
+      element.getAttribute?.('data-bib-id') ||
+      element.getAttribute?.('data-reference-id');
     const normalized = String(existing || '').trim();
     const id = /^[A-Za-z0-9_.:-]{1,256}$/.test(normalized) ? normalized : `notandia-${kind}-${index + 1}`;
-    element.setAttribute('data-mdpi-filter-ref-id', id);
+    element.setAttribute(REFERENCE_ID_ATTRIBUTE, id);
+    // Keep the old DOM attribute during the in-place store upgrade so mature
+    // citation/navigation code can continue to find the same record.
+    element.setAttribute(LEGACY_REFERENCE_ID_ATTRIBUTE, id);
     return id;
   }
 
@@ -133,22 +142,26 @@
     const numericAria = Number(aria);
     if (Number.isFinite(numericAria) && numericAria > 0) return numericAria;
 
-    const identifier = String(element.dataset?.mdpiFilterRefId || element.id || '');
+    const identifier = String(
+      element.dataset?.notandiaRefId || element.dataset?.mdpiFilterRefId || element.id || ''
+    );
     const knownPattern = identifier.match(/(?:^|[-_:])(?:ref(?:erence)?|cr|cit|bib|b|r)?[-_:]*0*(\d+)$/i)?.[1];
     const numericIdentifier = Number(knownPattern);
     return Number.isFinite(numericIdentifier) && numericIdentifier > 0 ? numericIdentifier : index + 1;
   }
 
   function configuredReferenceSelector() {
-    const selector = window.MDPIFilterReferenceSelectors;
+    const selector = window.NotandiaReferenceSelectors || window.MDPIFilterReferenceSelectors;
     return typeof selector === 'string' && selector.trim() ? selector : '';
   }
 
   function activeSearchConfig() {
-    return window.MDPIFilterDomainUtils?.getActiveSearchConfig?.(
+    const domainUtils = window.NotandiaDomainUtils || window.MDPIFilterDomainUtils;
+    const domains = window.NotandiaDomains || window.MDPIFilterDomains;
+    return domainUtils?.getActiveSearchConfig?.(
       location.hostname,
       location.pathname,
-      window.MDPIFilterDomains
+      domains
     ) || null;
   }
 
@@ -296,7 +309,8 @@
   function styleInlineCitations(record) {
     const visual = api.resolveVisualMatch(record.matches || []);
     if (!visual || !['highlight', 'dim', 'hide'].includes(visual.action)) return [];
-    const generator = window.MDPIFilterUtils?.generateInlineFootnoteSelectors;
+    const utils = window.NotandiaUtils || window.MDPIFilterUtils;
+    const generator = utils?.generateInlineFootnoteSelectors;
     if (typeof generator !== 'function') return [];
     const selectors = generator(record.id);
     if (!selectors) return [];
@@ -335,7 +349,7 @@
 
   async function enrichRecordsWithNcbi(records) {
     if (!ncbiEnabled || !records.length) return;
-    const resolver = window.MDPIFilterNcbiApiHandler?.resolveNcbiIdsToDois;
+    const resolver = (window.NotandiaNcbiApiHandler || window.MDPIFilterNcbiApiHandler)?.resolveNcbiIdsToDois;
     if (typeof resolver !== 'function') return;
 
     const pmids = new Set();
@@ -451,8 +465,13 @@
       if (chrome.runtime.lastError) return;
       settings = api.migrateLegacySettings(stored);
       ncbiEnabled = stored.ncbiApiEnabled === true;
-      if (!window.MDPIFilterSettings) window.MDPIFilterSettings = {};
-      window.MDPIFilterSettings.ncbiApiEnabled = ncbiEnabled;
+
+      const runtimeSettings = window.NotandiaSettings || window.MDPIFilterSettings || {};
+      runtimeSettings.ncbiApiEnabled = ncbiEnabled;
+      window.NotandiaSettings = runtimeSettings;
+      // Legacy compatibility alias for already-released modules.
+      window.MDPIFilterSettings = runtimeSettings;
+
       if (!stored.publisherWatchlist || stored.publisherWatchlist.schemaVersion !== api.SCHEMA_VERSION) {
         chrome.storage.sync.set({ publisherWatchlist: settings });
       }
