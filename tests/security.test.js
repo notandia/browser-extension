@@ -66,23 +66,29 @@ test('sanitizer preserves only plain string values', () => {
   assert.equal(window.sanitize({ text: 'Reference' }), '');
 });
 
-test('NCBI lookups validate, deduplicate, omit credentials, and enforce page budget', async () => {
-  const requests = [];
-  const fetch = async (url, options) => {
-    requests.push({ url: String(url), options });
-    return {
-      ok: true,
-      headers: { get: () => 'application/json; charset=utf-8' },
-      async json() { return { records: [] }; }
-    };
+test('NCBI lookups validate, deduplicate, avoid direct provider traffic, and enforce page budget', async () => {
+  const messages = [];
+  let directFetches = 0;
+  const window = { NotandiaSettings: { ncbiApiEnabled: true } };
+  const chrome = {
+    runtime: {
+      lastError: null,
+      sendMessage(message, callback) {
+        messages.push(message);
+        callback({ success: true, providerStatus: 'ok', records: [] });
+      }
+    }
   };
-
-  const window = { MDPIFilterSettings: { ncbiApiEnabled: true } };
-  loadScript('content/ncbi_api_handler.js', { window, fetch });
-  const handler = window.MDPIFilterNcbiApiHandler;
+  const fetch = async () => {
+    directFetches += 1;
+    throw new Error('content-side NCBI code must not fetch the provider directly');
+  };
+  loadScript('content/ncbi_api_handler.js', { window, chrome, fetch });
+  const handler = window.NotandiaNcbiApiHandler;
   const runCache = new Map();
   const persistentCache = new Map();
 
+  assert.equal(window.MDPIFilterNcbiApiHandler, handler);
   assert.deepEqual(
     Array.from(handler.normalizeIdsForQuery(['123', '123', 'bad', '456'], 'pmid')),
     ['123', '456']
@@ -99,20 +105,21 @@ test('NCBI lookups validate, deduplicate, omit credentials, and enforce page bud
     persistentCache
   );
 
-  assert.equal(requests.length, 3);
-  const queriedIds = requests.flatMap(request => new URL(request.url).searchParams.get('ids').split(','));
+  assert.equal(messages.length, 12);
+  const queriedIds = messages.flatMap(message => message.ids);
   assert.equal(queriedIds.length, 600);
   assert.equal(new Set(queriedIds).size, 600);
-  for (const request of requests) {
-    const parsed = new URL(request.url);
-    assert.equal(parsed.searchParams.get('tool'), 'notandia');
-    assert.equal(parsed.searchParams.has('email'), false);
-    assert.equal(request.options.credentials, 'omit');
-    assert.equal(request.options.referrerPolicy, 'no-referrer');
+  for (const message of messages) {
+    assert.equal(message.type, 'ncbiIdConversion');
+    assert.equal(message.idType, 'pmid');
+    assert.ok(message.ids.length <= 50);
+    assert.equal(Object.hasOwn(message, 'apiKey'), false);
+    assert.equal(Object.hasOwn(message, 'email'), false);
   }
+  assert.equal(directFetches, 0);
 
   await handler.checkNcbiIdsForMdpi(['901', '902'], 'pmid', runCache, persistentCache);
-  assert.equal(requests.length, 3);
+  assert.equal(messages.length, 12);
 });
 
 test('manifest and package maintain the converged least-privilege contract', () => {
