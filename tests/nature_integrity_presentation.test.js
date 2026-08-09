@@ -39,6 +39,7 @@ test('formal integrity presentation reuses the established inline selector gener
   assert.match(presentation, /generateInlineFootnoteSelectors/);
   assert.match(presentation, /const selectors = generator\(record\.id\)/);
   assert.match(presentation, /anchor\.classList\.add\('notandia-integrity-citation'\)/);
-  assert.match(presentation, /reference\.classList\.add\('notandia-integrity-reference'\)/);
+  assert.match(presentation, /element\.classList\.add\('notandia-integrity-reference'\)/);
+  assert.match(presentation, /contextElements\(record\)/);
   assert.match(presentation, /chip\.textContent = `\$\{definition\.icon/);
 });
