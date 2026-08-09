@@ -6,6 +6,7 @@
 
   const NCBI_ENDPOINT = 'https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/';
   const NCBI_TOOL = 'NotandiaBrowser';
+  const NCBI_EMAIL = 'mario.marcolongo.dev@gmail.com';
   const NCBI_MAX_IDS = 50;
   const NCBI_TIMEOUT_MS = 10000;
   const NCBI_MIN_REQUEST_INTERVAL_MS = 1100;
@@ -17,6 +18,7 @@
   const fallbackRecoveryTabs = new Set();
   const ncbiCache = new Map();
   const ncbiInflight = new Map();
+  let ncbiRequestTail = Promise.resolve();
   let ncbiNextRequestAt = 0;
   let ncbiBlockedUntil = 0;
   let ncbiBlockedStatus = 'cooldown';
@@ -120,11 +122,6 @@
   async function performNcbiFetch(ids, idType) {
     if (Date.now() < ncbiBlockedUntil) return ncbiCooldownResult();
 
-    const wait = Math.max(0, ncbiNextRequestAt - Date.now());
-    if (wait) await delay(wait);
-    if (Date.now() < ncbiBlockedUntil) return ncbiCooldownResult();
-    ncbiNextRequestAt = Date.now() + NCBI_MIN_REQUEST_INTERVAL_MS;
-
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), NCBI_TIMEOUT_MS);
     try {
@@ -134,7 +131,8 @@
         idtype: idType,
         format: 'json',
         versions: 'no',
-        tool: NCBI_TOOL
+        tool: NCBI_TOOL,
+        email: NCBI_EMAIL
       }).toString();
       const response = await fetch(url.toString(), {
         method: 'GET',
@@ -175,6 +173,19 @@
     }
   }
 
+  function enqueueNcbiFetch(ids, idType) {
+    const queued = ncbiRequestTail.then(async () => {
+      if (Date.now() < ncbiBlockedUntil) return ncbiCooldownResult();
+      const wait = Math.max(0, ncbiNextRequestAt - Date.now());
+      if (wait) await delay(wait);
+      if (Date.now() < ncbiBlockedUntil) return ncbiCooldownResult();
+      ncbiNextRequestAt = Date.now() + NCBI_MIN_REQUEST_INTERVAL_MS;
+      return performNcbiFetch(ids, idType);
+    });
+    ncbiRequestTail = queued.then(() => undefined, () => undefined);
+    return queued;
+  }
+
   async function fetchNcbiRecords(ids, idType) {
     if (!(await ncbiLookupEnabled())) {
       return { status: 'disabled', records: [], retryAfterMs: 0 };
@@ -184,7 +195,7 @@
     if (cached) return cached;
     if (ncbiInflight.has(key)) return ncbiInflight.get(key);
 
-    const request = performNcbiFetch(ids, idType)
+    const request = enqueueNcbiFetch(ids, idType)
       .then(result => {
         if (result.status === 'ok') cacheNcbiResult(key, result);
         return result;
