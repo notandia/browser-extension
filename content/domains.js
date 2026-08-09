@@ -32,10 +32,17 @@ const notandiaDomains = {
     hostRegex: /^www\.google\.[a-z.]+$/i,
     isGoogleWeb: true,
     path: /^\/search/,
-    // Ordinary organic results only. Google AI Overview and People Also Ask are
-    // decomposed into their individual sources/questions by the publisher scanner
-    // so one source cannot incorrectly style an entire generated-answer module.
-    itemSelector: 'div.MjjYud:not(:has(div#iur)):not(:has(.related-question-pair)):not(:has([data-subtree="mfc"])), div#iur div[jsname="qQjpJ"]',
+    // Treat ordinary results, each People Also Ask question, and each visible AI
+    // Overview source as separate evidence units. This prevents a single source
+    // from styling the whole FAQ/AI module while preserving source-level context.
+    itemSelector: [
+      'div.MjjYud:not(:has(div#iur)):not(:has(.related-question-pair)):not(:has([data-subtree="mfc"]))',
+      'div#iur div[jsname="qQjpJ"]',
+      'div.MjjYud .related-question-pair',
+      '[data-subtree="mfc"] [role="listitem"]:has(a[href])',
+      '[data-subtree="mfc"] span.WBgIic:has(a[href])',
+      '[data-subtree="mfc"] mark.HxTRcb:has(a[href])'
+    ].join(', '),
     linkSelector: 'a[href*="mdpi.com"], a[href*="mdpi.org"]',
     useNcbiApi: true,
     googleSpecialModules: true,
