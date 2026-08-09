@@ -6,7 +6,7 @@ Notandia is the current product identity. New general-purpose runtime APIs, DOM 
 
 ## Compatibility aliases
 
-The browser extension is an in-place update of software previously distributed as **MDPI Filter**. Some released runtime names, DOM attributes, storage keys, and browser identities cannot be removed in one step without risking upgrade regressions.
+The browser extension is an in-place update of software previously distributed under an older product identity. Some released runtime names, DOM attributes, storage keys, and browser identities cannot be removed in one step without risking upgrade regressions.
 
 During migration:
 
