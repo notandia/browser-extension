@@ -14,6 +14,8 @@ During migration:
 - canonical NCBI resolver API is `NotandiaNcbiApiHandler`;
 - canonical shared runtime settings object is `NotandiaSettings`;
 - new scanned DOM records receive `data-notandia-ref-id`;
+- resolved scholarly works can receive `data-notandia-doi` so publisher and formal-integrity presentation share one page identity;
+- search-result publisher matching and formal-integrity scanning consume the same search selectors and DOI/PMID/PMCID resolver path;
 - the corresponding legacy names/attributes may be populated as aliases while older modules still consume them;
 - new code must prefer the Notandia name and use the legacy name only as an explicit fallback or alias.
 
