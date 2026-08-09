@@ -38,7 +38,7 @@ function loadNcbiHandler(recordsForRequest) {
   };
   context.window = context;
   context.globalThis = context;
-  context.MDPIFilterSettings = { ncbiApiEnabled: true };
+  context.NotandiaSettings = { ncbiApiEnabled: true };
   vm.createContext(context);
   vm.runInContext(source('shared/work_identifiers.js'), context);
   vm.runInContext(source('content/ncbi_api_handler.js'), context);
@@ -64,11 +64,11 @@ test('resolves the supplied Google PMC and Europe PMC identifiers to MDPI DOIs t
     return [];
   });
 
-  const pmc = await fixture.context.MDPIFilterNcbiApiHandler.resolveNcbiIdsToDois(
+  const pmc = await fixture.context.NotandiaNcbiApiHandler.resolveNcbiIdsToDois(
     ['PMC6268482'],
     'pmcid'
   );
-  const europePmc = await fixture.context.MDPIFilterNcbiApiHandler.resolveNcbiIdsToDois(
+  const europePmc = await fixture.context.NotandiaNcbiApiHandler.resolveNcbiIdsToDois(
     ['22971582'],
     'pmid'
   );
@@ -82,14 +82,15 @@ test('resolves the supplied Google PMC and Europe PMC identifiers to MDPI DOIs t
       ['ncbiIdConversion', 'pmid', ['22971582']]
     ]
   );
+  assert.equal(fixture.context.MDPIFilterNcbiApiHandler, fixture.context.NotandiaNcbiApiHandler);
   assert.equal(fixture.directFetches(), 0);
 });
 
 test('content-side NCBI resolution is strictly opt-in', async () => {
   const fixture = loadNcbiHandler(() => []);
-  fixture.context.MDPIFilterSettings.ncbiApiEnabled = false;
+  fixture.context.NotandiaSettings.ncbiApiEnabled = false;
 
-  const result = await fixture.context.MDPIFilterNcbiApiHandler.resolveNcbiIdsToDois(
+  const result = await fixture.context.NotandiaNcbiApiHandler.resolveNcbiIdsToDois(
     ['22971582'],
     'pmid'
   );
@@ -114,4 +115,43 @@ test('publisher scanner recognizes biomedical URL evidence and enriches search r
   assert.doesNotMatch(source('content/ncbi_api_handler.js'), /https?:\/\//);
   assert.doesNotMatch(source('content/ncbi_api_handler.js'), /\bfetch\s*\(/);
   assert.match(source('content/ncbi_api_handler.js'), /type: 'ncbiIdConversion'/);
+});
+
+test('Google AI Overview and People Also Ask are split into source-level evidence units', () => {
+  const domains = source('content/domains.js');
+
+  assert.match(domains, /not\(:has\(\.related-question-pair\)\)/);
+  assert.match(domains, /not\(:has\(\[data-subtree="mfc"\]\)\)/);
+  assert.match(domains, /related-question-pair/);
+  assert.match(domains, /\[data-subtree="mfc"\].*\[role="listitem"\]:has\(a\[href\]\)/s);
+  assert.match(domains, /mark\.HxTRcb:has\(a\[href\]\)/);
+});
+
+test('formal integrity scanning uses the same search selectors and biomedical resolver as publisher context', () => {
+  const scanner = source('content/integrity_scanner.js');
+  const presentation = source('content/integrity_presentation.js');
+
+  assert.match(scanner, /window\.NotandiaWorkIdentifiers/);
+  assert.match(scanner, /window\.NotandiaDomainUtils \|\| window\.MDPIFilterDomainUtils/);
+  assert.match(scanner, /configuredSearchSelector/);
+  assert.match(scanner, /resolveNcbiIdsToDois/);
+  assert.match(scanner, /propagateExactTitleIdentities/);
+  assert.match(scanner, /data-notandia-doi/);
+  assert.match(scanner, /kind: record\.kind/);
+  assert.match(scanner, /notandia-context-scanner/);
+  assert.doesNotMatch(scanner, /window\.mdpiIntegrityScannerInjected/);
+
+  assert.match(presentation, /data-notandia-doi/);
+  assert.match(presentation, /window\.NotandiaUtils \|\| window\.MDPIFilterUtils/);
+  assert.match(presentation, /record\?\.kind !== 'current-article'/);
+});
+
+test('Google Scholar alternate URLs for one work can converge on one DOI without trusting RETRACTED title text as status evidence', () => {
+  const scanner = source('content/integrity_scanner.js');
+
+  assert.match(scanner, /replace\(\/\^\\s\*\(\?:retracted\|withdrawn\)\\s\*:\\s\*\/i, ''\)/);
+  assert.match(scanner, /candidates\?\.size !== 1/);
+  assert.match(scanner, /record\.doi = Array\.from\(candidates\)\[0\]/);
+  assert.doesNotMatch(scanner, /primaryStatus\s*=.*RETRACTED/i);
+  assert.doesNotMatch(scanner, /status.*title.*retract/i);
 });
