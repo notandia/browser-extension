@@ -100,36 +100,49 @@ test('content-side NCBI resolution is strictly opt-in', async () => {
   assert.equal(fixture.directFetches(), 0);
 });
 
-test('publisher scanner recognizes biomedical URL evidence and enriches search results before matching', () => {
+test('publisher scanner consumes the shared work mapper and NCBI resolver before matching', () => {
   const scanner = source('content/publisher_profile_scanner.js');
+  const mapper = source('shared/work_identifiers.js');
   const manifest = JSON.parse(source('manifest.json'));
   const scripts = manifest.content_scripts[0].js;
 
-  assert.match(scanner, /const match = url\.pathname\.match/);
-  assert.match(scanner, /europepmc\.org/);
-  assert.match(scanner, /med\|pmc/);
+  assert.match(scanner, /window\.NotandiaWorkIdentifiers/);
+  assert.match(scanner, /workIds\.extract/);
   assert.match(scanner, /resolveNcbiIdsToDois/);
   assert.match(scanner, /await enrichRecordsWithNcbi\(\[\.\.\.referenceRecords, \.\.\.searchRecords\]\)/);
-  assert.match(scanner, /ncbiApiEnabled: false/);
   assert.match(scanner, /stored\.ncbiApiEnabled === true/);
+
+  assert.match(mapper, /function parseEuropePmcArticle/);
+  assert.match(mapper, /isEuropePmcHost/);
+  assert.match(mapper, /europepmc-url/);
+  assert.match(mapper, /\(\?:PMC\)\?/);
+
   assert.ok(!scripts.includes('content/ncbi_fetch_proxy.js'));
+  assert.ok(scripts.indexOf('shared/work_identifiers.js') < scripts.indexOf('content/publisher_profile_scanner.js'));
   assert.ok(scripts.indexOf('content/ncbi_api_handler.js') < scripts.indexOf('content/publisher_profile_scanner.js'));
   assert.doesNotMatch(source('content/ncbi_api_handler.js'), /https?:\/\//);
   assert.doesNotMatch(source('content/ncbi_api_handler.js'), /\bfetch\s*\(/);
   assert.match(source('content/ncbi_api_handler.js'), /type: 'ncbiIdConversion'/);
 });
 
-test('Google AI Overview and People Also Ask are split into source-level evidence units', () => {
-  const domains = source('content/domains.js');
+test('Google AI Overview and People Also Ask expose sources rather than composite answer containers', () => {
+  const domainsSource = source('content/domains.js');
+  const context = { window: { location: { search: '' } } };
+  vm.createContext(context);
+  vm.runInContext(domainsSource, context);
+  const selector = context.window.NotandiaDomains.googleWeb.itemSelector;
+  const units = selector.split(',').map(value => value.trim());
 
-  assert.match(domains, /not\(:has\(\.related-question-pair\)\)/);
-  assert.match(domains, /not\(:has\(\[data-subtree="mfc"\]\)\)/);
-  assert.match(domains, /related-question-pair/);
-  assert.match(domains, /\[data-subtree="mfc"\].*\[role="listitem"\]:has\(a\[href\]\)/s);
-  assert.match(domains, /mark\.HxTRcb:has\(a\[href\]\)/);
+  assert.ok(selector.includes('div.MjjYud .related-question-pair span.WBgIic:has(a[href])'));
+  assert.ok(selector.includes('div.MjjYud .related-question-pair li.h7wxwc > div.cRH23c[data-src-id]:has(a[href])'));
+  assert.ok(selector.includes('[data-subtree="mfc"] span.WBgIic:has(a[href])'));
+  assert.ok(selector.includes('[data-subtree="mfc"] li.h7wxwc > div.cRH23c[data-src-id]:has(a[href])'));
+  assert.equal(units.includes('div.MjjYud .related-question-pair'), false);
+  assert.equal(units.includes('[data-subtree="mfc"]'), false);
+  assert.equal(selector.includes('[data-subtree="mfc"] [role="listitem"]:has(a[href])'), false);
 });
 
-test('formal integrity scanning uses the same search selectors and biomedical resolver as publisher context', () => {
+test('formal integrity scanning uses the same search selectors and work resolver as publisher context', () => {
   const scanner = source('content/integrity_scanner.js');
   const presentation = source('content/integrity_presentation.js');
 
