@@ -32,16 +32,18 @@ const notandiaDomains = {
     hostRegex: /^www\.google\.[a-z.]+$/i,
     isGoogleWeb: true,
     path: /^\/search/,
-    // Treat ordinary results, each People Also Ask question, and each visible AI
-    // Overview source as separate evidence units. This prevents a single source
-    // from styling the whole FAQ/AI module while preserving source-level context.
+    // A Google answer/module is not a source. Scan ordinary results plus the
+    // concrete source units embedded in AI Overview and People Also Ask.
+    // `li.h7wxwc > div.cRH23c[data-src-id]` is Google's observed source-card
+    // representation in the supplied live DOM. Restricting cards to h7wxwc
+    // avoids duplicate hidden/expanded copies of the same data-src-id.
     itemSelector: [
       'div.MjjYud:not(:has(div#iur)):not(:has(.related-question-pair)):not(:has([data-subtree="mfc"]))',
       'div#iur div[jsname="qQjpJ"]',
-      'div.MjjYud .related-question-pair',
-      '[data-subtree="mfc"] [role="listitem"]:has(a[href])',
+      'div.MjjYud .related-question-pair span.WBgIic:has(a[href])',
+      'div.MjjYud .related-question-pair li.h7wxwc > div.cRH23c[data-src-id]:has(a[href])',
       '[data-subtree="mfc"] span.WBgIic:has(a[href])',
-      '[data-subtree="mfc"] mark.HxTRcb:has(a[href])'
+      '[data-subtree="mfc"] li.h7wxwc > div.cRH23c[data-src-id]:has(a[href])'
     ].join(', '),
     linkSelector: 'a[href*="mdpi.com"], a[href*="mdpi.org"]',
     useNcbiApi: true,
