@@ -1,5 +1,7 @@
-// Defines the selectors used to identify reference list items on a page.
-window.MDPIFilterReferenceSelectors = [
+// Defines the selectors used to identify citation/source units on article pages.
+// These units are not required to be scholarly works: Wikipedia references,
+// Healthline trusted sources, and ordinary bibliography entries all belong here.
+window.NotandiaReferenceSelectors = [
   'li.c-article-references__item',
   'div.References p.ReferencesCopy1', // Frontiers-specific selector
   'li.html-x',
@@ -41,3 +43,7 @@ window.MDPIFilterReferenceSelectors = [
   // --- Added for Sagepub ---
   'div.citations[id^="bibr"]', // Sagepub reference items (e.g., id="bibr21-02698811231200023")
 ].join(',');
+
+// Compatibility alias for already-released consumers. New code should read the
+// Notandia name first and only fall back to this alias during migration.
+window.MDPIFilterReferenceSelectors = window.NotandiaReferenceSelectors;
