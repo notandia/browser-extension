@@ -41,31 +41,46 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(manifest.action.default_title, 'Notandia');
       assert.equal(manifest.homepage_url, 'https://mdpi-filter.pages.dev/');
       assert.deepEqual(manifest.permissions, ['storage']);
-      assert.ok(manifest.content_scripts[0].js.includes('shared/publisher_profiles.js'));
-      assert.ok(manifest.content_scripts[0].js.includes('content/reference_counter_normalizer.js'));
-      assert.ok(manifest.content_scripts[0].js.includes('content/publisher_profile_scanner.js'));
-      assert.ok(manifest.content_scripts[0].js.includes('content/integrity_scanner.js'));
-      assert.ok(manifest.content_scripts[0].js.includes('content/integrity_presentation.js'));
-      assert.equal(manifest.content_scripts[0].js.includes('content/ncbi_fetch_proxy.js'), false);
-      assert.ok(manifest.content_scripts[0].js.includes('content/ncbi_api_handler.js'));
-      assert.ok(manifest.content_scripts[0].js.includes('content/ncbi_article_scope.js'));
-      assert.ok(manifest.content_scripts[0].js.includes('content/ncbi_context_bridge.js'));
-      assert.ok(manifest.content_scripts[0].js.includes('content/inline_reference_mapper.js'));
+      const scripts = manifest.content_scripts[0].js;
+      assert.ok(scripts.includes('shared/work_identifiers.js'));
+      assert.ok(scripts.includes('shared/publisher_profiles.js'));
+      assert.ok(scripts.includes('content/reference_counter_normalizer.js'));
+      assert.ok(scripts.includes('content/source_context.js'));
+      assert.ok(scripts.includes('content/publisher_profile_scanner.js'));
+      assert.ok(scripts.includes('content/integrity_scanner.js'));
+      assert.ok(scripts.includes('content/integrity_presentation.js'));
+      assert.equal(scripts.includes('content/ncbi_fetch_proxy.js'), false);
+      assert.ok(scripts.includes('content/ncbi_api_handler.js'));
+      assert.ok(scripts.includes('content/ncbi_article_scope.js'));
+      assert.ok(scripts.includes('content/ncbi_context_bridge.js'));
+      assert.ok(scripts.includes('content/inline_reference_mapper.js'));
       assert.ok(
-        manifest.content_scripts[0].js.indexOf('content/inline_footnote_selectors.js') <
-        manifest.content_scripts[0].js.indexOf('content/inline_reference_mapper.js')
+        scripts.indexOf('content/inline_footnote_selectors.js') <
+        scripts.indexOf('content/inline_reference_mapper.js')
       );
       assert.ok(
-        manifest.content_scripts[0].js.indexOf('content/inline_reference_mapper.js') <
-        manifest.content_scripts[0].js.indexOf('content/publisher_profile_scanner.js')
+        scripts.indexOf('shared/work_identifiers.js') <
+        scripts.indexOf('content/source_context.js')
       );
       assert.ok(
-        manifest.content_scripts[0].js.indexOf('content/ncbi_api_handler.js') <
-        manifest.content_scripts[0].js.indexOf('content/integrity_scanner.js')
+        scripts.indexOf('content/reference_selectors.js') <
+        scripts.indexOf('content/source_context.js')
       );
       assert.ok(
-        manifest.content_scripts[0].js.indexOf('content/ncbi_article_scope.js') <
-        manifest.content_scripts[0].js.indexOf('content/ncbi_context_bridge.js')
+        scripts.indexOf('content/source_context.js') <
+        scripts.indexOf('content/publisher_profile_scanner.js')
+      );
+      assert.ok(
+        scripts.indexOf('content/source_context.js') <
+        scripts.indexOf('content/integrity_scanner.js')
+      );
+      assert.ok(
+        scripts.indexOf('content/ncbi_api_handler.js') <
+        scripts.indexOf('content/integrity_scanner.js')
+      );
+      assert.ok(
+        scripts.indexOf('content/ncbi_article_scope.js') <
+        scripts.indexOf('content/ncbi_context_bridge.js')
       );
       assert.ok(manifest.content_scripts[0].css.includes('content/integrity_presentation.css'));
     }
@@ -98,6 +113,7 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'publisher_profiles.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'shared', 'integrity.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'reference_counter_normalizer.js')), true);
+      assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'source_context.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'publisher_profile_scanner.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_scanner.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'integrity_presentation.js')), true);
