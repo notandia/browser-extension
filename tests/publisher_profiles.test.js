@@ -47,6 +47,44 @@ test('custom profiles accept only declarative domains and DOI prefixes', () => {
   assert.equal(api.normalizeProfile({ id: 'bad', name: 'Bad', domains: ['javascript:alert(1)'], doiPrefixes: [] }), null);
 });
 
+test('mature detector signals feed the MDPI profile without creating another presentation pipeline', () => {
+  const settings = api.defaultSettings();
+  const confirmed = api.matchProfiles(settings, {
+    hostnames: ['europepmc.org'],
+    dois: [],
+    profileSignals: [{ profileId: 'mdpi', confidence: 'confirmed', reason: 'mature-mdpi-detector' }]
+  });
+  assert.equal(confirmed.length, 1);
+  assert.equal(confirmed[0].profileId, 'mdpi');
+  assert.equal(confirmed[0].confidence, 'confirmed');
+  assert.deepEqual(confirmed[0].reasons, ['mature-mdpi-detector']);
+
+  const potential = api.matchProfiles(settings, {
+    hostnames: ['example.org'],
+    dois: [],
+    profileSignals: [{ profileId: 'mdpi', confidence: 'potential', reason: 'mature-google-context' }]
+  });
+  assert.equal(potential.length, 1);
+  assert.equal(potential[0].confidence, 'potential');
+
+  settings.profiles.find(profile => profile.id === 'mdpi').confidencePolicy = 'confirmed-only';
+  assert.equal(api.matchProfiles(settings, {
+    hostnames: ['example.org'],
+    dois: [],
+    profileSignals: [{ profileId: 'mdpi', confidence: 'potential', reason: 'mature-google-context' }]
+  }).length, 0);
+});
+
+test('profile signals cannot make one publisher profile impersonate another', () => {
+  const settings = api.defaultSettings();
+  const matches = api.matchProfiles(settings, {
+    hostnames: ['example.org'],
+    dois: [],
+    profileSignals: [{ profileId: 'mdpi', confidence: 'confirmed', reason: 'mature-mdpi-detector' }]
+  });
+  assert.equal(matches.some(match => match.profileId === 'frontiers'), false);
+});
+
 test('multiple profile matches resolve deterministically by visual action', () => {
   const selected = api.resolveVisualMatch([
     { profileId: 'a', action: 'highlight' },
@@ -63,6 +101,7 @@ test('runtime and interfaces load the general publisher system', () => {
   const options = fs.readFileSync(path.join(root, 'options.html'), 'utf8');
   const scanner = fs.readFileSync(path.join(root, 'content', 'publisher_profile_scanner.js'), 'utf8');
   assert.ok(manifest.content_scripts[0].js.includes('shared/publisher_profiles.js'));
+  assert.ok(manifest.content_scripts[0].js.includes('content/source_context.js'));
   assert.ok(manifest.content_scripts[0].js.includes('content/publisher_profile_scanner.js'));
   assert.match(popupHtml, /Article context/);
   assert.match(popupHtml, /Report (?:an )?article\/context issue/);
@@ -71,6 +110,7 @@ test('runtime and interfaces load the general publisher system', () => {
   assert.match(scanner, /data-notandia-profile-signature/);
   assert.match(scanner, /const originalStyles = new WeakMap\(\)/);
   assert.match(scanner, /currentSignature === signature/);
+  assert.match(scanner, /MDPIFilterItemContentChecker\?\.checkItemContent/);
   assert.match(popupJs, /const address = `\$\{parsed\.origin\}\$\{parsed\.pathname\}`/);
   assert.doesNotMatch(popupJs, /parsed\.(?:search|hash)/);
   assert.match(popupJs, /enabledProfiles/);
