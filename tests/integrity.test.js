@@ -143,14 +143,19 @@ test('integrity network behavior is explicit opt-in and cancellable', () => {
 
 test('integrity runtime restores reports before falling back to a rescan', () => {
   const scanner = source('content/integrity_scanner.js');
+  const context = source('content/source_context.js');
   const presentation = source('content/integrity_presentation.js');
   const support = source('background_support.js');
   const persistence = source('background_persistence.js');
   const popupRecovery = source('popup_recovery.js');
   const popupHtml = source('popup.html');
 
-  assert.match(scanner, /getAttribute\?\.\('data-counter'\)/);
-  assert.match(scanner, /referenceNumber\(element, index\)/);
+  // Stable source numbering/identity is owned once by the shared source context,
+  // then integrity serializes those records without reimplementing page parsing.
+  assert.match(context, /getAttribute\?\.\('data-counter'\)/);
+  assert.match(context, /function referenceNumber\(element, index\)/);
+  assert.match(context, /number: kind === 'reference' \? referenceNumber\(element, index\) : searchResultNumber\(element, index\)/);
+  assert.match(scanner, /sourceContext\.buildRecord/);
   assert.match(scanner, /records\.map\(record => \[record\.id, record\.kind, record\.number, record\.doi\]\)/);
   assert.match(scanner, /sendResponse\(\{ scheduled: true \}\)/);
 
@@ -222,10 +227,13 @@ test('all browser targets load publisher, integrity, and recovery runtimes safel
   assert.equal(Object.hasOwn(manifest.background, 'type'), false);
   assert.ok(scripts.includes('shared/publisher_profiles.js'));
   assert.ok(scripts.includes('content/reference_counter_normalizer.js'));
+  assert.ok(scripts.includes('content/source_context.js'));
   assert.ok(scripts.includes('content/publisher_profile_scanner.js'));
   assert.ok(scripts.includes('content/integrity_scanner.js'));
   assert.ok(scripts.includes('content/integrity_presentation.js'));
   assert.ok(scripts.indexOf('content/reference_counter_normalizer.js') < scripts.indexOf('content/publisher_profile_scanner.js'));
+  assert.ok(scripts.indexOf('content/source_context.js') < scripts.indexOf('content/publisher_profile_scanner.js'));
+  assert.ok(scripts.indexOf('content/source_context.js') < scripts.indexOf('content/integrity_scanner.js'));
   assert.equal(scripts.includes('content/ncbi_fetch_proxy.js'), false);
   assert.ok(scripts.indexOf('content/ncbi_api_handler.js') < scripts.indexOf('content/publisher_profile_scanner.js'));
   assert.ok(scripts.indexOf('content/ncbi_api_handler.js') < scripts.indexOf('content/integrity_scanner.js'));
