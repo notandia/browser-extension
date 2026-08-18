@@ -5,140 +5,29 @@
   window.notandiaPublisherScannerInjected = true;
 
   const api = window.NotandiaPublisherProfiles;
-  if (!api) return;
+  const sourceContext = window.NotandiaSourceContext;
+  if (!api || !sourceContext) return;
 
-  const DOI_PATTERN = /\b10\.\d{4,9}\/[A-Z0-9._;()/:+-]+/gi;
-  const MAX_REFERENCES = 300;
-  const MAX_SEARCH_RESULTS = 150;
-  const MAX_TEXT = 500;
   const STYLE_ATTRIBUTE = 'data-notandia-profile-style';
   const SIGNATURE_ATTRIBUTE = 'data-notandia-profile-signature';
   const INLINE_ACTION_ATTRIBUTE = 'data-notandia-publisher-action';
   const INLINE_PROFILE_ATTRIBUTE = 'data-notandia-publisher-profile';
   const STYLE_PROPERTIES = Object.freeze(['display', 'opacity', 'border-left', 'padding-left', 'background-color']);
-  const OWN_NODE_SELECTOR = '.notandia-publisher-badges,.notandia-publisher-badge,.notandia-integrity-chip';
   const originalStyles = new WeakMap();
   const managedElements = new Set();
   const managedInlineAnchors = new Set();
+
   let settings = api.defaultSettings();
+  let ncbiEnabled = false;
   let scanTimer = null;
+  let scanGeneration = 0;
   let lastFingerprint = '';
 
-  function normalizeDoi(value) {
-    let normalized = String(value || '').trim();
-    try { normalized = decodeURIComponent(normalized); } catch {}
-    normalized = normalized
-      .replace(/^doi\s*:\s*/i, '')
-      .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '')
-      .replace(/[\s\u00A0]+/g, '')
-      .replace(/[),.;:\]}>'"`]+$/g, '')
-      .toLowerCase();
-    return /^10\.\d{4,9}\/[\w.()/:;+-]+$/i.test(normalized) ? normalized : null;
-  }
-
-  function addDoi(set, value) {
-    const direct = normalizeDoi(value);
-    if (direct) set.add(direct);
-    for (const match of String(value || '').matchAll(DOI_PATTERN)) {
-      const doi = normalizeDoi(match[0]);
-      if (doi) set.add(doi);
-    }
-  }
-
-  function addHostname(set, value) {
-    try {
-      const url = new URL(String(value || ''), document.baseURI);
-      if (/^https?:$/.test(url.protocol)) set.add(url.hostname.toLowerCase().replace(/^www\./, ''));
-    } catch {}
-  }
-
-  function cleanElementText(element) {
-    const clone = element.cloneNode(true);
-    clone.querySelectorAll('.notandia-publisher-badges,.notandia-mdpi-profile-badge,.notandia-integrity-chip').forEach(node => node.remove());
-    return String(clone.textContent || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT);
-  }
-
-  function evidenceFromElement(element, cleanText) {
-    const dois = new Set();
-    const hostnames = new Set();
-    for (const attribute of ['data-doi', 'data-article-doi', 'data-reference-doi']) {
-      const value = element.getAttribute?.(attribute);
-      if (value) addDoi(dois, value);
-    }
-    for (const link of element.querySelectorAll?.('a[href]') || []) {
-      const href = link.getAttribute('href') || '';
-      addHostname(hostnames, href);
-      addDoi(dois, href);
-      addDoi(dois, link.getAttribute('data-doi') || '');
-    }
-    addDoi(dois, cleanText);
-    return { dois: Array.from(dois), hostnames: Array.from(hostnames) };
-  }
-
-  function currentArticleEvidence() {
-    const dois = new Set();
-    const hostnames = new Set([location.hostname.toLowerCase().replace(/^www\./, '')]);
-    for (const selector of [
-      'meta[name="citation_doi"]', 'meta[name="dc.identifier"]', 'meta[name="DC.Identifier"]',
-      'meta[name="doi"]', 'meta[property="citation_doi"]'
-    ]) addDoi(dois, document.querySelector(selector)?.getAttribute('content') || '');
-    addDoi(dois, document.querySelector('link[rel="canonical"]')?.getAttribute('href') || '');
-    addDoi(dois, location.href);
-    return { dois: Array.from(dois), hostnames: Array.from(hostnames) };
-  }
-
-  function safeRecordId(element, index, kind) {
-    const existing = element.dataset?.mdpiFilterRefId || element.id || element.getAttribute?.('data-bib-id') || element.getAttribute?.('data-reference-id');
-    const normalized = String(existing || '').trim();
-    const id = /^[A-Za-z0-9_.:-]{1,256}$/.test(normalized) ? normalized : `notandia-${kind}-${index + 1}`;
-    element.setAttribute('data-mdpi-filter-ref-id', id);
-    return id;
-  }
-
-  function referenceNumber(element, index) {
-    const counter = String(element.getAttribute?.('data-counter') || '').match(/\d+/)?.[0];
-    const numericCounter = Number(counter);
-    if (Number.isFinite(numericCounter) && numericCounter > 0) return numericCounter;
-
-    const aria = String(element.getAttribute?.('aria-label') || '').match(/(?:reference|citation)\s*(\d+)/i)?.[1];
-    const numericAria = Number(aria);
-    if (Number.isFinite(numericAria) && numericAria > 0) return numericAria;
-
-    const identifier = String(element.dataset?.mdpiFilterRefId || element.id || '');
-    const knownPattern = identifier.match(/(?:^|[-_:])(?:ref(?:erence)?|cr|cit|bib|b|r)?[-_:]*0*(\d+)$/i)?.[1];
-    const numericIdentifier = Number(knownPattern);
-    return Number.isFinite(numericIdentifier) && numericIdentifier > 0 ? numericIdentifier : index + 1;
-  }
-
-  function configuredReferenceSelector() {
-    const selector = window.MDPIFilterReferenceSelectors;
-    return typeof selector === 'string' && selector.trim() ? selector : '';
-  }
-
-  function referenceNodes() {
-    const selector = configuredReferenceSelector();
-    if (!selector) return [];
-    try {
-      let nodes = Array.from(document.querySelectorAll(selector));
-      nodes = nodes.filter(node => !nodes.some(other => other !== node && other.contains(node)));
-      const hasNatureMainBibliography = nodes.some(node => node.matches?.('li.c-article-references__item'));
-      if (hasNatureMainBibliography) {
-        nodes = nodes.filter(node => !node.closest?.('.c-reading-companion,.c-reading-companion__reference-item'));
-      }
-      return nodes.slice(0, MAX_REFERENCES);
-    } catch {
-      return [];
-    }
-  }
-
-  function searchNodes() {
-    const config = window.MDPIFilterDomainUtils?.getActiveSearchConfig?.(location.hostname, location.pathname, window.MDPIFilterDomains);
-    if (!config) return [];
-    try {
-      return Array.from(document.querySelectorAll(config.itemSelector || config.container || '')).slice(0, MAX_SEARCH_RESULTS);
-    } catch {
-      return [];
-    }
+  function profileEvidence(record) {
+    return {
+      dois: Array.from(record?.evidence?.dois || []),
+      hostnames: Array.from(record?.evidence?.hostnames || [])
+    };
   }
 
   function rgba(hex, alpha) {
@@ -253,7 +142,8 @@
   function styleInlineCitations(record) {
     const visual = api.resolveVisualMatch(record.matches || []);
     if (!visual || !['highlight', 'dim', 'hide'].includes(visual.action)) return [];
-    const generator = window.MDPIFilterUtils?.generateInlineFootnoteSelectors;
+    const utils = window.NotandiaUtils || window.MDPIFilterUtils;
+    const generator = utils?.generateInlineFootnoteSelectors;
     if (typeof generator !== 'function') return [];
     const selectors = generator(record.id);
     if (!selectors) return [];
@@ -275,21 +165,6 @@
     return styled;
   }
 
-  function buildRecord(element, index, kind) {
-    const text = cleanElementText(element);
-    const evidence = evidenceFromElement(element, text);
-    const matches = api.matchProfiles(settings, evidence);
-    return {
-      element,
-      id: safeRecordId(element, index, kind),
-      kind,
-      number: kind === 'reference' ? referenceNumber(element, index) : index + 1,
-      doi: evidence.dois[0] || null,
-      text,
-      matches
-    };
-  }
-
   function ensureStyleSheet() {
     if (document.getElementById('notandia-publisher-profile-styles')) return;
     const style = document.createElement('style');
@@ -305,18 +180,36 @@
     document.documentElement.appendChild(style);
   }
 
-  function scan() {
-    ensureStyleSheet();
-    const referenceRecords = referenceNodes().map((element, index) => buildRecord(element, index, 'reference'));
-    const searchRecords = searchNodes().map((element, index) => buildRecord(element, index, 'search-result'));
-    const allElements = new Set([...referenceRecords, ...searchRecords].map(record => record.element));
+  function serializeRecord(record) {
+    return {
+      id: record.id,
+      kind: record.kind,
+      number: record.number,
+      doi: record.doi,
+      text: record.text,
+      matches: record.matches
+    };
+  }
 
+  async function scan(generation) {
+    ensureStyleSheet();
+    const { references: referenceRecords, searchResults: searchRecords, all } = sourceContext.collectRecords({
+      maxReferences: 300,
+      maxSearchResults: 150,
+      maxTextLength: 500
+    });
+
+    await sourceContext.resolveRecordsWithNcbi(all, ncbiEnabled);
+    if (generation !== scanGeneration) return;
+
+    for (const record of all) record.matches = api.matchProfiles(settings, profileEvidence(record));
+    const allElements = new Set(all.map(record => record.element));
     for (const element of Array.from(managedElements)) {
       if (!allElements.has(element)) clearProfileStyle(element);
     }
 
     const currentInline = new Set();
-    for (const record of [...referenceRecords, ...searchRecords]) {
+    for (const record of all) {
       applyStyle(record.element, record.matches);
       if (record.kind === 'reference' && record.matches.length) {
         for (const anchor of styleInlineCitations(record)) currentInline.add(anchor);
@@ -326,24 +219,42 @@
       if (!currentInline.has(anchor)) clearInlineAnchor(anchor);
     }
 
-    const currentEvidence = currentArticleEvidence();
-    const currentArticle = { doi: currentEvidence.dois[0] || null, matches: api.matchProfiles(settings, currentEvidence) };
-    const references = referenceRecords.filter(record => record.matches.length).map(({ element, ...record }) => record);
-    const searchResults = searchRecords.filter(record => record.matches.length).map(({ element, ...record }) => record);
+    const currentEvidence = sourceContext.currentArticleEvidence();
+    const currentArticle = {
+      doi: currentEvidence.dois[0] || null,
+      matches: api.matchProfiles(settings, {
+        dois: currentEvidence.dois,
+        hostnames: currentEvidence.hostnames
+      })
+    };
+    const references = referenceRecords.filter(record => record.matches.length).map(serializeRecord);
+    const searchResults = searchRecords.filter(record => record.matches.length).map(serializeRecord);
     const fingerprint = JSON.stringify([
       settings,
+      ncbiEnabled,
       currentArticle,
       references.map(record => [record.id, record.number, record.doi, record.matches.map(match => [match.profileId, match.action, match.confidence])]),
       searchResults.map(record => [record.id, record.number, record.doi, record.matches.map(match => [match.profileId, match.action, match.confidence])])
     ]);
     if (fingerprint === lastFingerprint) return;
     lastFingerprint = fingerprint;
-    chrome.runtime.sendMessage({ type: 'publisherContextUpdate', data: { currentArticle, references, searchResults } }, () => void chrome.runtime.lastError);
+    chrome.runtime.sendMessage(
+      { type: 'publisherContextUpdate', data: { currentArticle, references, searchResults } },
+      () => void chrome.runtime.lastError
+    );
   }
 
   function scheduleScan(delay = 250) {
     clearTimeout(scanTimer);
-    scanTimer = setTimeout(scan, delay);
+    const generation = ++scanGeneration;
+    scanTimer = setTimeout(() => void scan(generation), delay);
+  }
+
+  function exposeRuntimeSettings() {
+    const runtimeSettings = window.NotandiaSettings || window.MDPIFilterSettings || {};
+    runtimeSettings.ncbiApiEnabled = ncbiEnabled;
+    window.NotandiaSettings = runtimeSettings;
+    window.MDPIFilterSettings = runtimeSettings;
   }
 
   function loadSettings() {
@@ -351,10 +262,13 @@
       publisherWatchlist: null,
       mode: 'highlight',
       highlightPotentialMdpiSites: true,
-      potentialMdpiHighlightColor: '#E2211C'
+      potentialMdpiHighlightColor: '#E2211C',
+      ncbiApiEnabled: false
     }, stored => {
       if (chrome.runtime.lastError) return;
       settings = api.migrateLegacySettings(stored);
+      ncbiEnabled = stored.ncbiApiEnabled === true;
+      exposeRuntimeSettings();
       if (!stored.publisherWatchlist || stored.publisherWatchlist.schemaVersion !== api.SCHEMA_VERSION) {
         chrome.storage.sync.set({ publisherWatchlist: settings });
       }
@@ -363,25 +277,16 @@
     });
   }
 
-  function nodeTouchesReferences(node) {
-    if (!(node instanceof Element)) return false;
-    if (node.matches(OWN_NODE_SELECTOR) || node.closest(OWN_NODE_SELECTOR)) return false;
-    const selector = configuredReferenceSelector();
-    if (!selector) return false;
-    try {
-      if (node.matches(selector) || node.querySelector(selector)) return true;
-      if (node.matches('a[href*="#"],a[href*="doi.org"],a[href*="10."]')) return true;
-      return Boolean(node.querySelector('a[href*="#"],a[href*="doi.org"],a[href*="10."]'));
-    } catch {
-      return false;
-    }
-  }
-
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'sync' && (changes.publisherWatchlist || changes.mode || changes.highlightPotentialMdpiSites || changes.potentialMdpiHighlightColor)) {
-      loadSettings();
-    }
+    if (area === 'sync' && (
+      changes.publisherWatchlist ||
+      changes.mode ||
+      changes.highlightPotentialMdpiSites ||
+      changes.potentialMdpiHighlightColor ||
+      changes.ncbiApiEnabled
+    )) loadSettings();
   });
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.id !== chrome.runtime.id || message?.type !== 'forcePublisherRescan') return false;
     lastFingerprint = '';
@@ -393,8 +298,8 @@
   loadSettings();
   const observer = new MutationObserver(mutations => {
     if (mutations.some(mutation =>
-      Array.from(mutation.addedNodes).some(nodeTouchesReferences) ||
-      Array.from(mutation.removedNodes).some(nodeTouchesReferences)
+      Array.from(mutation.addedNodes).some(sourceContext.nodeTouchesSourceContext) ||
+      Array.from(mutation.removedNodes).some(sourceContext.nodeTouchesSourceContext)
     )) scheduleScan(500);
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
