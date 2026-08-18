@@ -6,20 +6,20 @@
 
   const api = window.NotandiaPublisherProfiles;
   const workIds = window.NotandiaWorkIdentifiers;
-  if (!api || !workIds) return;
+  const sourceContext = window.NotandiaSourceContext;
+  if (!api || !workIds || !sourceContext) return;
 
-  const DOI_PATTERN = /\b10\.\d{4,9}\/[A-Z0-9._;()/:+-]+/gi;
   const MAX_REFERENCES = 300;
   const MAX_SEARCH_RESULTS = 150;
   const MAX_TEXT = 500;
   const STYLE_ATTRIBUTE = 'data-notandia-profile-style';
   const SIGNATURE_ATTRIBUTE = 'data-notandia-profile-signature';
-  const REFERENCE_ID_ATTRIBUTE = 'data-notandia-ref-id';
-  const LEGACY_REFERENCE_ID_ATTRIBUTE = 'data-mdpi-filter-ref-id';
   const INLINE_ACTION_ATTRIBUTE = 'data-notandia-publisher-action';
   const INLINE_PROFILE_ATTRIBUTE = 'data-notandia-publisher-profile';
   const STYLE_PROPERTIES = Object.freeze(['display', 'opacity', 'border-left', 'padding-left', 'background-color']);
-  const OWN_NODE_SELECTOR = '.notandia-publisher-badges,.notandia-publisher-badge,.notandia-integrity-chip';
+  const OWN_NODE_SELECTOR = '.notandia-publisher-badges,.notandia-publisher-badge,.notandia-integrity-chip,#notandia-publisher-profile-styles';
+  const MDPI_DOMAINS = Object.freeze(['mdpi.com', 'mdpi.org']);
+  const MDPI_DOI_PREFIX = '10.3390';
   const originalStyles = new WeakMap();
   const managedElements = new Set();
   const managedInlineAnchors = new Set();
@@ -29,172 +29,29 @@
   let scanGeneration = 0;
   let lastFingerprint = '';
 
-  function normalizeDoi(value) {
-    return workIds.normalizeDOI(value) || null;
-  }
-
-  function addDoi(set, value) {
-    const direct = normalizeDoi(value);
-    if (direct) set.add(direct);
-    for (const match of String(value || '').matchAll(DOI_PATTERN)) {
-      const doi = normalizeDoi(match[0]);
-      if (doi) set.add(doi);
-    }
-  }
-
-  function addHostname(set, value) {
-    try {
-      const url = new URL(String(value || ''), document.baseURI);
-      if (/^https?:$/.test(url.protocol)) set.add(url.hostname.toLowerCase().replace(/^www\./, ''));
-    } catch {}
-  }
-
-  function addEuropePmcIdentifiers(identity, value) {
-    try {
-      const url = new URL(String(value || ''), document.baseURI);
-      const host = url.hostname.toLowerCase().replace(/^www\./, '');
-      if (host !== 'europepmc.org' && !host.endsWith('.europepmc.org')) return;
-      const match = url.pathname.match(/^\/article\/(med|pmc)\/([^/?#]+)/i);
-      if (!match) return;
-      if (match[1].toLowerCase() === 'med') {
-        const pmid = /^\d{1,12}$/.test(match[2]) ? match[2] : null;
-        if (pmid) identity.identifiers.pmid.push(pmid);
-      } else {
-        const pmcid = /^PMC\d{1,12}$/i.test(match[2]) ? match[2].toUpperCase() : null;
-        if (pmcid) identity.identifiers.pmcid.push(pmcid);
-      }
-    } catch {}
-  }
-
-  function finalizeIdentifierList(values) {
-    return Array.from(new Set((values || []).filter(Boolean))).sort();
-  }
-
-  function cleanElementText(element) {
-    const clone = element.cloneNode(true);
-    clone.querySelectorAll('.notandia-publisher-badges,.notandia-mdpi-profile-badge,.notandia-integrity-chip').forEach(node => node.remove());
-    return String(clone.textContent || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT);
-  }
-
-  function evidenceFromElement(element, cleanText) {
-    const hostnames = new Set();
-    const values = [cleanText];
-    for (const attribute of ['data-doi', 'data-article-doi', 'data-reference-doi']) {
-      const value = element.getAttribute?.(attribute);
-      if (value) values.push(value);
-    }
-    for (const link of element.querySelectorAll?.('a[href]') || []) {
-      const href = link.getAttribute('href') || '';
-      values.push(href, link.getAttribute('data-doi') || '');
-      addHostname(hostnames, href);
-    }
-
+  function currentArticleEvidence() {
+    const values = [];
+    for (const selector of [
+      'meta[name="citation_doi"]',
+      'meta[name="dc.identifier"]',
+      'meta[name="DC.Identifier"]',
+      'meta[name="doi"]',
+      'meta[property="citation_doi"]'
+    ]) values.push(document.querySelector(selector)?.getAttribute('content') || '');
+    values.push(document.querySelector('link[rel="canonical"]')?.getAttribute('href') || '', location.href);
     const identity = workIds.extract(values, {
-      source: 'publisher-profile-scanner',
-      method: 'page-evidence',
+      source: 'notandia-source-context',
+      method: 'current-article',
       confidence: 'exact'
     });
-    for (const link of element.querySelectorAll?.('a[href]') || []) {
-      addEuropePmcIdentifiers(identity, link.getAttribute('href') || '');
-    }
-
     return {
-      dois: finalizeIdentifierList(identity.identifiers.doi),
-      pmids: finalizeIdentifierList(identity.identifiers.pmid),
-      pmcids: finalizeIdentifierList(identity.identifiers.pmcid),
-      hostnames: Array.from(hostnames)
+      dois: Array.from(identity.identifiers.doi || []),
+      pmids: Array.from(identity.identifiers.pmid || []),
+      pmcids: Array.from(identity.identifiers.pmcid || []),
+      arxiv: Array.from(identity.identifiers.arxiv || []),
+      hostnames: [location.hostname.toLowerCase().replace(/^www\./, '')],
+      profileSignals: []
     };
-  }
-
-  function currentArticleEvidence() {
-    const dois = new Set();
-    const hostnames = new Set([location.hostname.toLowerCase().replace(/^www\./, '')]);
-    for (const selector of [
-      'meta[name="citation_doi"]', 'meta[name="dc.identifier"]', 'meta[name="DC.Identifier"]',
-      'meta[name="doi"]', 'meta[property="citation_doi"]'
-    ]) addDoi(dois, document.querySelector(selector)?.getAttribute('content') || '');
-    addDoi(dois, document.querySelector('link[rel="canonical"]')?.getAttribute('href') || '');
-    addDoi(dois, location.href);
-    return { dois: Array.from(dois), hostnames: Array.from(hostnames) };
-  }
-
-  function safeRecordId(element, index, kind) {
-    const existing = element.dataset?.notandiaRefId ||
-      element.dataset?.mdpiFilterRefId ||
-      element.id ||
-      element.getAttribute?.('data-bib-id') ||
-      element.getAttribute?.('data-reference-id');
-    const normalized = String(existing || '').trim();
-    const id = /^[A-Za-z0-9_.:-]{1,256}$/.test(normalized) ? normalized : `notandia-${kind}-${index + 1}`;
-    element.setAttribute(REFERENCE_ID_ATTRIBUTE, id);
-    // Keep the old DOM attribute during the in-place store upgrade so mature
-    // citation/navigation code can continue to find the same record.
-    element.setAttribute(LEGACY_REFERENCE_ID_ATTRIBUTE, id);
-    return id;
-  }
-
-  function referenceNumber(element, index) {
-    const counter = String(element.getAttribute?.('data-counter') || '').match(/\d+/)?.[0];
-    const numericCounter = Number(counter);
-    if (Number.isFinite(numericCounter) && numericCounter > 0) return numericCounter;
-
-    const aria = String(element.getAttribute?.('aria-label') || '').match(/(?:reference|citation)\s*(\d+)/i)?.[1];
-    const numericAria = Number(aria);
-    if (Number.isFinite(numericAria) && numericAria > 0) return numericAria;
-
-    const identifier = String(
-      element.dataset?.notandiaRefId || element.dataset?.mdpiFilterRefId || element.id || ''
-    );
-    const knownPattern = identifier.match(/(?:^|[-_:])(?:ref(?:erence)?|cr|cit|bib|b|r)?[-_:]*0*(\d+)$/i)?.[1];
-    const numericIdentifier = Number(knownPattern);
-    return Number.isFinite(numericIdentifier) && numericIdentifier > 0 ? numericIdentifier : index + 1;
-  }
-
-  function configuredReferenceSelector() {
-    const selector = window.NotandiaReferenceSelectors || window.MDPIFilterReferenceSelectors;
-    return typeof selector === 'string' && selector.trim() ? selector : '';
-  }
-
-  function activeSearchConfig() {
-    const domainUtils = window.NotandiaDomainUtils || window.MDPIFilterDomainUtils;
-    const domains = window.NotandiaDomains || window.MDPIFilterDomains;
-    return domainUtils?.getActiveSearchConfig?.(
-      location.hostname,
-      location.pathname,
-      domains
-    ) || null;
-  }
-
-  function configuredSearchSelector() {
-    const config = activeSearchConfig();
-    const selector = config?.itemSelector || config?.container || '';
-    return typeof selector === 'string' && selector.trim() ? selector : '';
-  }
-
-  function referenceNodes() {
-    const selector = configuredReferenceSelector();
-    if (!selector) return [];
-    try {
-      let nodes = Array.from(document.querySelectorAll(selector));
-      nodes = nodes.filter(node => !nodes.some(other => other !== node && other.contains(node)));
-      const hasNatureMainBibliography = nodes.some(node => node.matches?.('li.c-article-references__item'));
-      if (hasNatureMainBibliography) {
-        nodes = nodes.filter(node => !node.closest?.('.c-reading-companion,.c-reading-companion__reference-item'));
-      }
-      return nodes.slice(0, MAX_REFERENCES);
-    } catch {
-      return [];
-    }
-  }
-
-  function searchNodes() {
-    const selector = configuredSearchSelector();
-    if (!selector) return [];
-    try {
-      return Array.from(document.querySelectorAll(selector)).slice(0, MAX_SEARCH_RESULTS);
-    } catch {
-      return [];
-    }
   }
 
   function rgba(hex, alpha) {
@@ -217,26 +74,44 @@
 
   function restoreOriginalStyles(element) {
     const snapshot = originalStyles.get(element);
-    if (!snapshot) return;
+    if (!snapshot) return false;
     for (const [property, state] of Object.entries(snapshot)) {
       if (state.value) element.style.setProperty(property, state.value, state.priority);
       else element.style.removeProperty(property);
     }
     originalStyles.delete(element);
+    return true;
   }
 
   function clearProfileStyle(element) {
-    if (!element) return;
-    const hasManagedState = managedElements.has(element) ||
-      element.hasAttribute?.(STYLE_ATTRIBUTE) ||
-      element.hasAttribute?.(SIGNATURE_ATTRIBUTE) ||
+    if (!(element instanceof Element)) return;
+    const hadNotandiaState = element.hasAttribute(STYLE_ATTRIBUTE) ||
+      element.hasAttribute(SIGNATURE_ATTRIBUTE) ||
       Boolean(element.querySelector?.(':scope > .notandia-publisher-badges'));
+    const hasManagedState = managedElements.has(element) || hadNotandiaState;
     if (!hasManagedState) return;
-    restoreOriginalStyles(element);
+
+    const restored = restoreOriginalStyles(element);
+    // Extension reloads replace the JS WeakMap but not the already-mutated page DOM.
+    // If a previous injection left our marker attributes behind, remove only the
+    // properties Notandia itself manages so obsolete parent highlights disappear.
+    if (!restored && hadNotandiaState) {
+      for (const property of STYLE_PROPERTIES) element.style.removeProperty(property);
+    }
     element.querySelectorAll?.(':scope > .notandia-publisher-badges').forEach(node => node.remove());
     element.removeAttribute(STYLE_ATTRIBUTE);
     element.removeAttribute(SIGNATURE_ATTRIBUTE);
     managedElements.delete(element);
+  }
+
+  function clearOrphanedProfileStyles(currentElements) {
+    let marked = [];
+    try {
+      marked = Array.from(document.querySelectorAll(`[${STYLE_ATTRIBUTE}], [${SIGNATURE_ATTRIBUTE}]`));
+    } catch {}
+    for (const element of marked) {
+      if (!currentElements.has(element)) clearProfileStyle(element);
+    }
   }
 
   function addBadges(element, matches) {
@@ -333,18 +208,9 @@
   }
 
   function buildRecord(element, index, kind) {
-    const text = cleanElementText(element);
-    const evidence = evidenceFromElement(element, text);
-    return {
-      element,
-      evidence,
-      id: safeRecordId(element, index, kind),
-      kind,
-      number: kind === 'reference' ? referenceNumber(element, index) : index + 1,
-      doi: evidence.dois[0] || null,
-      text,
-      matches: api.matchProfiles(settings, evidence)
-    };
+    const record = sourceContext.buildRecord(element, index, kind, MAX_TEXT);
+    record.matches = [];
+    return record;
   }
 
   async function enrichRecordsWithNcbi(records) {
@@ -355,7 +221,7 @@
     const pmids = new Set();
     const pmcids = new Set();
     for (const record of records) {
-      if (record.evidence.dois.length) continue;
+      if (record.doi) continue;
       for (const pmid of record.evidence.pmids || []) pmids.add(pmid);
       for (const pmcid of record.evidence.pmcids || []) pmcids.add(pmcid);
     }
@@ -368,7 +234,7 @@
       : { doiById: new Map() };
 
     for (const record of records) {
-      if (record.evidence.dois.length) continue;
+      if (record.doi) continue;
       let resolved = null;
       for (const pmid of record.evidence.pmids || []) {
         resolved = pmidResolution.doiById?.get(pmid) || null;
@@ -380,10 +246,65 @@
           if (resolved) break;
         }
       }
-      if (!resolved) continue;
-      record.evidence.dois = [resolved];
-      record.doi = resolved;
-      record.matches = api.matchProfiles(settings, record.evidence);
+      if (resolved) sourceContext.setResolvedDoi(record, resolved);
+    }
+  }
+
+  function addProfileSignal(record, confidence, reason) {
+    record.evidence.profileSignals ||= [];
+    const signature = `mdpi|${confidence}|${reason}`;
+    if (record.evidence.profileSignals.some(signal => `${signal.profileId}|${signal.confidence}|${signal.reason}` === signature)) return;
+    record.evidence.profileSignals.push({ profileId: 'mdpi', confidence, reason });
+  }
+
+  function matureMdpiSignals(records) {
+    const itemChecker = window.MDPIFilterItemContentChecker?.checkItemContent;
+    const googleChecker = typeof window.GoogleContentChecker === 'function'
+      ? new window.GoogleContentChecker()
+      : null;
+    if (typeof itemChecker !== 'function' && !googleChecker) return;
+
+    const runCache = new Map();
+    for (const record of records) {
+      const isMdpi = Boolean(record.doi && record.doi.startsWith(`${MDPI_DOI_PREFIX}/`));
+      if (!record.doi) continue;
+      for (const id of [
+        ...(record.evidence.pmids || []),
+        ...(record.evidence.pmcids || []),
+        ...(record.evidence.dois || [])
+      ]) runCache.set(id, isMdpi);
+    }
+
+    const googleWeb = sourceContext.activeSearchConfig()?.isGoogleWeb === true;
+    for (const record of records) {
+      let confirmed = false;
+      if (typeof itemChecker === 'function') {
+        try {
+          const primaryUrl = record.element.querySelector?.('a[href]')?.getAttribute('href') || null;
+          confirmed = itemChecker(
+            record.element,
+            runCache,
+            MDPI_DOI_PREFIX,
+            MDPI_DOMAINS,
+            record.doi,
+            primaryUrl,
+            googleChecker
+          ) === true;
+        } catch {
+          confirmed = false;
+        }
+      }
+      if (confirmed) {
+        addProfileSignal(record, 'confirmed', 'mature-mdpi-detector');
+        continue;
+      }
+
+      // Preserve the older Google-web potential signal without applying it to
+      // Scholar or bibliography records, where generic words such as PMID/PMC
+      // would otherwise create noisy publisher matches.
+      if (googleWeb && googleChecker?.checkForPotentialMdpiKeywordsInText?.(record.element)) {
+        addProfileSignal(record, 'potential', 'mature-google-context');
+      }
     }
   }
 
@@ -404,18 +325,25 @@
 
   async function scan(generation) {
     ensureStyleSheet();
-    const referenceRecords = referenceNodes().map((element, index) => buildRecord(element, index, 'reference'));
-    const searchRecords = searchNodes().map((element, index) => buildRecord(element, index, 'search-result'));
-    await enrichRecordsWithNcbi([...referenceRecords, ...searchRecords]);
-    if (generation !== scanGeneration) return;
+    const referenceRecords = sourceContext.referenceNodes(MAX_REFERENCES)
+      .map((element, index) => buildRecord(element, index, 'reference'));
+    const searchRecords = sourceContext.searchNodes(MAX_SEARCH_RESULTS)
+      .map((element, index) => buildRecord(element, index, 'search-result'));
+    const allRecords = [...referenceRecords, ...searchRecords];
 
-    const allElements = new Set([...referenceRecords, ...searchRecords].map(record => record.element));
+    await enrichRecordsWithNcbi(allRecords);
+    if (generation !== scanGeneration) return;
+    matureMdpiSignals(allRecords);
+    for (const record of allRecords) record.matches = api.matchProfiles(settings, record.evidence);
+
+    const allElements = new Set(allRecords.map(record => record.element));
+    clearOrphanedProfileStyles(allElements);
     for (const element of Array.from(managedElements)) {
       if (!allElements.has(element)) clearProfileStyle(element);
     }
 
     const currentInline = new Set();
-    for (const record of [...referenceRecords, ...searchRecords]) {
+    for (const record of allRecords) {
       applyStyle(record.element, record.matches);
       if (record.kind === 'reference' && record.matches.length) {
         for (const anchor of styleInlineCitations(record)) currentInline.add(anchor);
@@ -426,13 +354,16 @@
     }
 
     const currentEvidence = currentArticleEvidence();
-    const currentArticle = { doi: currentEvidence.dois[0] || null, matches: api.matchProfiles(settings, currentEvidence) };
+    const currentArticle = {
+      doi: currentEvidence.dois[0] || null,
+      matches: api.matchProfiles(settings, currentEvidence)
+    };
     const references = referenceRecords
       .filter(record => record.matches.length)
-      .map(({ element, evidence, ...record }) => record);
+      .map(({ element, evidence, identity, title, ...record }) => record);
     const searchResults = searchRecords
       .filter(record => record.matches.length)
-      .map(({ element, evidence, ...record }) => record);
+      .map(({ element, evidence, identity, title, ...record }) => record);
     const fingerprint = JSON.stringify([
       settings,
       ncbiEnabled,
@@ -469,7 +400,7 @@
       const runtimeSettings = window.NotandiaSettings || window.MDPIFilterSettings || {};
       runtimeSettings.ncbiApiEnabled = ncbiEnabled;
       window.NotandiaSettings = runtimeSettings;
-      // Legacy compatibility alias for already-released modules.
+      // Compatibility alias retained for the mature MDPI evidence module.
       window.MDPIFilterSettings = runtimeSettings;
 
       if (!stored.publisherWatchlist || stored.publisherWatchlist.schemaVersion !== api.SCHEMA_VERSION) {
@@ -484,13 +415,17 @@
     if (!(node instanceof Element)) return false;
     if (node.matches(OWN_NODE_SELECTOR) || node.closest(OWN_NODE_SELECTOR)) return false;
 
-    const selectors = [configuredReferenceSelector(), configuredSearchSelector()].filter(Boolean);
+    const selectors = [
+      sourceContext.configuredReferenceSelector(),
+      sourceContext.configuredSearchSelector()
+    ].filter(Boolean);
     try {
       for (const selector of selectors) {
         if (node.matches(selector) || node.querySelector(selector)) return true;
       }
-      if (node.matches('a[href*="#"],a[href*="doi.org"],a[href*="10."],a[href*="pubmed.ncbi.nlm.nih.gov"],a[href*="pmc.ncbi.nlm.nih.gov"],a[href*="europepmc.org/article/"]')) return true;
-      return Boolean(node.querySelector('a[href*="#"],a[href*="doi.org"],a[href*="10."],a[href*="pubmed.ncbi.nlm.nih.gov"],a[href*="pmc.ncbi.nlm.nih.gov"],a[href*="europepmc.org/article/"]'));
+      const evidenceSelector = 'a[href*="#"],a[href*="doi.org"],a[href*="10."],a[href*="pubmed.ncbi.nlm.nih.gov"],a[href*="pmc.ncbi.nlm.nih.gov"],a[href*="europepmc.org/article/"]';
+      if (node.matches(evidenceSelector)) return true;
+      return Boolean(node.querySelector(evidenceSelector));
     } catch {
       return false;
     }
