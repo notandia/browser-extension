@@ -148,32 +148,56 @@
     return normalizedDoi === normalizedPrefix || normalizedDoi.startsWith(`${normalizedPrefix}/`);
   }
 
+  function profileSignals(evidence, profileId) {
+    return (Array.isArray(evidence?.profileSignals) ? evidence.profileSignals : [])
+      .filter(signal => String(signal?.profileId || '').toLowerCase() === profileId)
+      .map(signal => ({
+        confidence: signal?.confidence === 'potential' ? 'potential' : 'confirmed',
+        reason: String(signal?.reason || 'detector-signal').trim().slice(0, 80) || 'detector-signal'
+      }));
+  }
+
   function matchProfile(profile, evidence = {}) {
     const normalized = normalizeProfile(profile, { builtin: profile?.source === 'builtin' });
     if (!normalized || !normalized.enabled) return null;
     const reasons = [];
     const hostnames = Array.isArray(evidence.hostnames) ? evidence.hostnames : [];
     const dois = Array.isArray(evidence.dois) ? evidence.dois : [];
+    let confidence = null;
+
     for (const hostname of hostnames) {
       if (normalized.domains.some(domain => hostnameMatches(hostname, domain))) {
         reasons.push('publisher-domain');
+        confidence = 'confirmed';
         break;
       }
     }
     for (const doi of dois) {
       if (normalized.doiPrefixes.some(prefix => doiMatches(doi, prefix))) {
         reasons.push('doi-prefix');
+        confidence = 'confirmed';
         break;
       }
     }
-    if (!reasons.length) return null;
-    const confidence = 'confirmed';
+
+    const signals = profileSignals(evidence, normalized.id);
+    const confirmedSignals = signals.filter(signal => signal.confidence === 'confirmed');
+    const potentialSignals = signals.filter(signal => signal.confidence === 'potential');
+    if (confirmedSignals.length) {
+      confidence = 'confirmed';
+      reasons.push(...confirmedSignals.map(signal => signal.reason));
+    } else if (!confidence && potentialSignals.length) {
+      confidence = 'potential';
+      reasons.push(...potentialSignals.map(signal => signal.reason));
+    }
+
+    if (!confidence || !reasons.length) return null;
     if (confidence === 'potential' && normalized.confidencePolicy !== 'confirmed-and-potential') return null;
     return {
       profileId: normalized.id,
       profileName: normalized.name,
       confidence,
-      reasons,
+      reasons: Array.from(new Set(reasons)),
       action: normalized.action,
       color: normalized.color
     };

@@ -1,0 +1,63 @@
+html,
+body {
+  width: 420px;
+  min-width: 420px;
+  max-width: 420px;
+  overflow-x: hidden;
+}
+
+.container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.settings-icon-close {
+  display: none;
+}
+
+#settingsIcon[aria-expanded="true"] .settings-icon-gear {
+  display: none;
+}
+
+#settingsIcon[aria-expanded="true"] .settings-icon-close {
+  display: block;
+}
+
+#settingsIcon[aria-expanded="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+body.settings-mode .overview-section,
+body.settings-mode .article-section,
+body.settings-mode .results-section,
+body.settings-mode .report-section {
+  display: none !important;
+}
+
+body.settings-mode .settings-panel {
+  margin-bottom: 0;
+}
+
+body.settings-mode .popup-header {
+  margin-bottom: 10px;
+}

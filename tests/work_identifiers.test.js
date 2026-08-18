@@ -39,6 +39,30 @@ test('normalizes DOI, PMID, PMCID and arXiv identifiers from canonical URLs', ()
   );
 });
 
+test('normalizes Europe PMC MED and PMC article URLs through the shared mapper', () => {
+  const mapper = loadMapper();
+
+  assert.equal(
+    mapper.normalizePMID('https://europepmc.org/article/med/32205204'),
+    '32205204'
+  );
+  assert.equal(
+    mapper.normalizePMCID('https://europepmc.org/article/pmc/7102549'),
+    'PMC7102549'
+  );
+  assert.equal(
+    mapper.normalizePMCID('https://europepmc.org/article/pmc/pmc6627373'),
+    'PMC6627373'
+  );
+
+  const identity = mapper.extract([
+    'https://europepmc.org/article/pmc/7102549',
+    'https://europepmc.org/article/med/32205204'
+  ], { source: 'google-scholar-result' });
+  assert.deepEqual(Array.from(identity.identifiers.pmid), ['32205204']);
+  assert.deepEqual(Array.from(identity.identifiers.pmcid), ['PMC7102549']);
+});
+
 test('extracts exact identifiers without treating arbitrary numbers as PMIDs', () => {
   const mapper = loadMapper();
   const identity = mapper.extract([

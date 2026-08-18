@@ -72,13 +72,30 @@
     pollTimer = setTimeout(requestReport, delay);
   }
 
-  function findReferenceElement(referenceId) {
-    if (!SAFE_REFERENCE_ID.test(String(referenceId || ''))) return null;
-    for (const element of document.querySelectorAll('[data-mdpi-filter-ref-id]')) {
-      if (element.getAttribute('data-mdpi-filter-ref-id') === referenceId) return element;
+  function contextElements(record) {
+    const found = new Set();
+    const referenceId = String(record?.id || '');
+    const doi = normalizeDoi(record?.doi || '');
+
+    if (SAFE_REFERENCE_ID.test(referenceId)) {
+      for (const attribute of ['data-notandia-ref-id', 'data-mdpi-filter-ref-id']) {
+        for (const element of document.querySelectorAll(`[${attribute}]`)) {
+          if (element.getAttribute(attribute) === referenceId) found.add(element);
+        }
+      }
+      const byId = document.getElementById(referenceId);
+      if (byId) found.add(byId.closest('li') || byId);
     }
-    const byId = document.getElementById(referenceId);
-    return byId?.closest('li') || byId || null;
+
+    // Multiple search results may represent the same scholarly work through different
+    // URLs (publisher, PubMed, Europe PMC, etc.). The shared scanner writes the
+    // resolved DOI to every equivalent result so one formal lookup can style them all.
+    if (doi) {
+      for (const element of document.querySelectorAll('[data-notandia-doi]')) {
+        if (normalizeDoi(element.getAttribute('data-notandia-doi') || '') === doi) found.add(element);
+      }
+    }
+    return Array.from(found);
   }
 
   function clearPresentation() {
@@ -98,17 +115,19 @@
 
   function presentationIsCurrent(records) {
     for (const record of records) {
-      const reference = findReferenceElement(record.id);
-      if (!reference) continue;
-      if (!reference.classList.contains('notandia-integrity-reference')) return false;
-      if (reference.getAttribute('data-notandia-integrity-status') !== record.primaryStatus) return false;
-      if (!reference.querySelector(`.notandia-integrity-chip[data-notandia-integrity-chip="${record.id}"]`)) return false;
+      const elements = contextElements(record);
+      if (!elements.length) continue;
+      for (const element of elements) {
+        if (!element.classList.contains('notandia-integrity-reference')) return false;
+        if (element.getAttribute('data-notandia-integrity-status') !== record.primaryStatus) return false;
+      }
     }
     return true;
   }
 
   function styleInlineCitations(record, definition) {
-    const generator = window.MDPIFilterUtils?.generateInlineFootnoteSelectors;
+    const utils = window.NotandiaUtils || window.MDPIFilterUtils;
+    const generator = utils?.generateInlineFootnoteSelectors;
     if (typeof generator !== 'function') return;
     const selectors = generator(record.id);
     if (!selectors) return;
@@ -125,9 +144,21 @@
     }
   }
 
+  function ensureChip(element, record, definition) {
+    const selector = `.notandia-integrity-chip[data-notandia-integrity-chip="${record.id}"]`;
+    if (element.querySelector(selector)) return;
+    const chip = document.createElement('span');
+    chip.className = 'notandia-integrity-chip';
+    chip.setAttribute('data-notandia-integrity-chip', record.id);
+    chip.style.setProperty('--notandia-integrity-color', definition.color);
+    chip.textContent = `${definition.icon || '•'} ${definition.label || record.primaryStatus}`;
+    chip.title = `Formal post-publication signal for ${record.doi || 'this work'}`;
+    element.appendChild(chip);
+  }
+
   function applyReport(report, statuses) {
     const affected = (report?.records || []).filter(record =>
-      record?.kind === 'reference' &&
+      record?.kind !== 'current-article' &&
       SAFE_REFERENCE_ID.test(String(record.id || '')) &&
       SAFE_STATUS.test(String(record.primaryStatus || ''))
     );
@@ -149,19 +180,12 @@
     for (const record of affected) {
       const definition = statuses?.[record.primaryStatus] || FALLBACK_STATUSES[record.primaryStatus];
       if (!definition) continue;
-      const reference = findReferenceElement(record.id);
-      if (reference) {
-        reference.classList.add('notandia-integrity-reference');
-        reference.setAttribute('data-notandia-integrity-status', record.primaryStatus);
-        reference.style.setProperty('--notandia-integrity-color', definition.color);
-        reference.style.setProperty('--notandia-integrity-tint', rgba(definition.color, 0.08));
-        const chip = document.createElement('span');
-        chip.className = 'notandia-integrity-chip';
-        chip.setAttribute('data-notandia-integrity-chip', record.id);
-        chip.style.setProperty('--notandia-integrity-color', definition.color);
-        chip.textContent = `${definition.icon || '•'} ${definition.label || record.primaryStatus}`;
-        chip.title = `Formal post-publication signal for ${record.doi || 'this reference'}`;
-        reference.appendChild(chip);
+      for (const element of contextElements(record)) {
+        element.classList.add('notandia-integrity-reference');
+        element.setAttribute('data-notandia-integrity-status', record.primaryStatus);
+        element.style.setProperty('--notandia-integrity-color', definition.color);
+        element.style.setProperty('--notandia-integrity-tint', rgba(definition.color, 0.08));
+        ensureChip(element, record, definition);
       }
       styleInlineCitations(record, definition);
     }

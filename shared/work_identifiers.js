@@ -26,6 +26,26 @@
     return String(value || '').replace(/[\s\u00a0),.;:\]}>'"`]+$/g, '');
   }
 
+  function isEuropePmcHost(hostname) {
+    return hostname === 'europepmc.org' || hostname.endsWith('.europepmc.org');
+  }
+
+  function parseEuropePmcArticle(url) {
+    if (!url || !isEuropePmcHost(url.hostname.toLowerCase().replace(/^www\./, ''))) return null;
+    const match = url.pathname.match(/^\/article\/(med|pmc)\/([^/?#]+)/i);
+    if (!match) return null;
+    const type = match[1].toLowerCase();
+    const rawId = String(match[2] || '').trim();
+    if (type === 'med' && PMID_EXACT.test(rawId)) {
+      return Object.freeze({ pmid: rawId, pmcid: null });
+    }
+    if (type === 'pmc') {
+      const numeric = rawId.match(/^(?:PMC)?(\d{1,12})$/i)?.[1] || null;
+      if (numeric) return Object.freeze({ pmid: null, pmcid: `PMC${numeric}` });
+    }
+    return null;
+  }
+
   function normalizeDOI(value) {
     let normalized = safeDecode(value)
       .replace(/^doi\s*:\s*/i, '')
@@ -49,6 +69,8 @@
         normalized = url.searchParams.get('list_uids') ||
           url.pathname.match(/\/pubmed\/(\d{1,12})(?:\D|$)/i)?.[1] ||
           '';
+      } else if (isEuropePmcHost(hostname)) {
+        normalized = parseEuropePmcArticle(url)?.pmid || '';
       }
     } catch {
       const explicit = normalized.match(/(?:^|\b)PMID\s*:?\s*(\d{1,12})(?:\b|$)/i)?.[1];
@@ -68,6 +90,8 @@
       const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
       if (hostname === 'pmc.ncbi.nlm.nih.gov' || hostname === 'ncbi.nlm.nih.gov' || hostname.endsWith('.ncbi.nlm.nih.gov')) {
         normalized = url.pathname.match(/\/(?:articles\/)?(PMC\d{1,12})(?:\D|$)/i)?.[1] || '';
+      } else if (isEuropePmcHost(hostname)) {
+        normalized = parseEuropePmcArticle(url)?.pmcid || '';
       }
     } catch {
       const explicit = normalized.match(/(?:^|\b)(PMC\d{1,12})(?:\b|$)/i)?.[1];
@@ -197,6 +221,10 @@
     if (hostname === 'pmc.ncbi.nlm.nih.gov' || hostname.endsWith('.ncbi.nlm.nih.gov')) {
       addIdentifier(identity, 'pmcid', url.href, { ...options, method: 'pmc-url' });
       addIdentifier(identity, 'pmid', url.href, { ...options, method: 'ncbi-url' });
+    }
+    if (isEuropePmcHost(hostname)) {
+      addIdentifier(identity, 'pmcid', url.href, { ...options, method: 'europepmc-url' });
+      addIdentifier(identity, 'pmid', url.href, { ...options, method: 'europepmc-url' });
     }
     if (hostname === 'arxiv.org' || hostname.endsWith('.arxiv.org')) {
       addIdentifier(identity, 'arxiv', url.href, { ...options, method: 'arxiv-url' });
