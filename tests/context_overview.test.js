@@ -95,6 +95,7 @@ test('publisher and integrity scans expose loading state without premature count
 
 test('MDPI bibliography IDs cannot replace visible reference numbers', () => {
   const normalizer = source('content/reference_counter_normalizer.js');
+  const context = source('content/source_context.js');
   const scanner = source('content/integrity_scanner.js');
 
   assert.match(normalizer, /\^B0\*\(\\d\+\)/);
@@ -102,10 +103,11 @@ test('MDPI bibliography IDs cannot replace visible reference numbers', () => {
   assert.match(normalizer, /getComputedStyle\(element, '::before'\)/);
   assert.doesNotMatch(normalizer, /\d\+\(\?!\.\*\d\)/);
 
-  assert.match(scanner, /getAttribute\?\.\('data-counter'\)/);
-  assert.match(scanner, /'data-content'/);
-  assert.match(scanner, /\^B0\*\(\\d\+\)/);
-  assert.doesNotMatch(scanner, /match\(\/\\d\+\(\?!\.\*\\d\)\/\)/);
+  assert.match(context, /getAttribute\?\.\('data-counter'\)/);
+  assert.match(context, /'data-content'/);
+  assert.match(context, /\^B0\*\(\\d\+\)/);
+  assert.doesNotMatch(context, /match\(\/\\d\+\(\?!\.\*\\d\)\/\)/);
+  assert.match(scanner, /sourceContext\.collectRecords/);
 });
 
 test('current integrity presentation stops after extension reload invalidates its context', () => {
@@ -119,5 +121,5 @@ test('current integrity presentation stops after extension reload invalidates it
     assert.match(runtime, /observer\?\.disconnect\(\)/);
   }
   assert.match(presentation, /runtime\.sendMessage\(\{ type: 'getIntegrityReport' \}/);
-  assert.match(scanner, /runtime\.storageGet\('sync'/);
+  assert.match(scanner, /runtime\.storageGet\([\s\S]*'sync'/);
 });
