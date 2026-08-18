@@ -25,15 +25,22 @@ test('Notandia context is source-first rather than scholarly-only', () => {
   assert.match(references, /window\.MDPIFilterReferenceSelectors = window\.NotandiaReferenceSelectors/);
 });
 
-test('publisher and integrity scanners share source selectors and work identity mapper', () => {
+test('publisher and integrity scanners share one source-selector and work-identity owner', () => {
+  const context = source('content/source_context.js');
   const publisher = source('content/publisher_profile_scanner.js');
   const integrity = source('content/integrity_scanner.js');
 
+  assert.match(context, /window\.NotandiaReferenceSelectors \|\| window\.MDPIFilterReferenceSelectors/);
+  assert.match(context, /window\.NotandiaDomainUtils \|\| window\.MDPIFilterDomainUtils/);
+  assert.match(context, /window\.NotandiaWorkIdentifiers/);
+  assert.match(context, /function configuredSearchSelector/);
+  assert.match(context, /function evidenceFromElement/);
+
   for (const scanner of [publisher, integrity]) {
-    assert.match(scanner, /window\.NotandiaReferenceSelectors \|\| window\.MDPIFilterReferenceSelectors/);
-    assert.match(scanner, /window\.NotandiaDomainUtils \|\| window\.MDPIFilterDomainUtils/);
-    assert.match(scanner, /window\.NotandiaWorkIdentifiers/);
-    assert.match(scanner, /configuredSearchSelector/);
+    assert.match(scanner, /window\.NotandiaSourceContext/);
+    assert.match(scanner, /sourceContext\.referenceNodes/);
+    assert.match(scanner, /sourceContext\.searchNodes/);
+    assert.match(scanner, /sourceContext\.buildRecord/);
   }
 });
 
