@@ -37,10 +37,13 @@ test('session persistence avoids stale loading reports and delayed-save races', 
 
 test('integrity scanner ignores unrelated page and extension mutations', () => {
   const scanner = source('content/integrity_scanner.js');
+  const context = source('content/source_context.js');
 
   assert.match(scanner, /OWN_NODE_SELECTOR/);
   assert.match(scanner, /function nodeTouchesIntegrityContext\(/);
-  assert.match(scanner, /c-reading-companion/);
+  assert.match(scanner, /sourceContext\.configuredReferenceSelector\(\)/);
+  assert.match(scanner, /sourceContext\.configuredSearchSelector\(\)/);
+  assert.match(context, /c-reading-companion/);
   assert.match(scanner, /mutation\.addedNodes/);
   assert.doesNotMatch(scanner, /setTimeout\(\(\) => scheduleScan\(0\), 2500\)/);
 });
