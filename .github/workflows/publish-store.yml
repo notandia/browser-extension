@@ -98,7 +98,6 @@ jobs:
         shell: bash
         env:
           SOURCE_ZIP: ${{ steps.package.outputs.path }}
-          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
           CHROME_CRX_PRIVATE_KEY_B64: ${{ secrets.CHROME_CRX_PRIVATE_KEY_B64 }}
         run: |
           set -euo pipefail
@@ -122,14 +121,10 @@ jobs:
           chmod 600 "$KEY_PATH"
           openssl pkey -in "$KEY_PATH" -check -noout
 
-          DERIVED_EXTENSION_ID="$(
-            openssl pkey -in "$KEY_PATH" -pubout -outform DER \
-              | node -e "const crypto=require('node:crypto');const chunks=[];process.stdin.on('data',d=>chunks.push(d));process.stdin.on('end',()=>{const hex=crypto.createHash('sha256').update(Buffer.concat(chunks)).digest('hex').slice(0,32);process.stdout.write([...hex].map(c=>String.fromCharCode(97+parseInt(c,16))).join(''));});"
-          )"
-          if [[ "$DERIVED_EXTENSION_ID" != "$CHROME_EXTENSION_ID" ]]; then
-            echo "The CRX signing key does not match CHROME_EXTENSION_ID." >&2
-            exit 1
-          fi
+          # Verified-upload keys are separate from Google's publication key.
+          # The store verifies the registered upload key and then re-signs the
+          # package, preserving the existing store extension ID.
+          # https://developer.chrome.com/blog/verified-uploads-cws
 
           unzip -q "$SOURCE_ZIP" -d "$WORK_DIR"
           command -v google-chrome >/dev/null

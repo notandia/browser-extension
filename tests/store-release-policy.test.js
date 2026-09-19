@@ -22,7 +22,8 @@ test('Chrome publication requires a verified CRX and isolated signing key', () =
 
   assert.match(workflow, /CHROME_CRX_PRIVATE_KEY_B64/);
   assert.match(workflow, /google-chrome --pack-extension=/);
-  assert.match(workflow, /The CRX signing key does not match CHROME_EXTENSION_ID/);
+  assert.doesNotMatch(workflow, /DERIVED_EXTENSION_ID/);
+  assert.match(workflow, /CHROME_EXTENSION_ID: \$\{\{ secrets\.CHROME_EXTENSION_ID \}\}/);
   assert.match(workflow, /openssl pkey -in/);
   assert.match(workflow, /trap cleanup EXIT/);
   assert.match(publisher, /must be a signed \.crx file/);
