@@ -174,3 +174,16 @@ test('in-page citation backlinks do not turn every reference into the hosting pu
     context.NotandiaPublisherProfiles.defaultSettings(), record.evidence
   ).length, 0);
 });
+
+test('Scholar cached navigation and snippets cannot identify an unrelated result', () => {
+  const context = page(`<div class="gs_r"><h3 class="gs_rt"><a href="https://example.org/unrelated">Another paper</a></h3><div class="gs_rs">Discusses PMC7102549 and DOI 10.1016/j.ijantimicag.2020.105949</div><a href="https://scholar.googleusercontent.com/scholar?q=cache:example/+PMC7102549">View as HTML</a></div>`, 'https://scholar.google.com/scholar?q=PMC7102549');
+  const record = context.NotandiaSourceContext.buildRecord(context.document.querySelector('.gs_r'), 0, 'search-result');
+  assert.equal(record.doi, null);
+  assert.deepEqual(Array.from(record.evidence.pmcids), []);
+});
+
+test('Scholar uses the canonical title DOI before a PDF mirror path', () => {
+  const context = page(`<div class="gs_r"><a href="https://link.springer.com/content/pdf/10.1007/s13312-020-1852-4.pdf">PDF</a><h3 class="gs_rt"><a href="https://link.springer.com/article/10.1007/s13312-020-1852-4">Paper title</a></h3></div>`, 'https://scholar.google.com/scholar?q=PMC7102549');
+  const record = context.NotandiaSourceContext.buildRecord(context.document.querySelector('.gs_r'), 0, 'search-result');
+  assert.equal(record.doi, '10.1007/s13312-020-1852-4');
+});

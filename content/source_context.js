@@ -131,7 +131,10 @@
     const hostnames = new Set();
     // The 500-character popup excerpt is not an identity-extraction limit: a
     // long author list can put the DOI at the end of a perfectly valid citation.
-    const values = [cleanText(element, 20000) || text];
+    const evidenceText = cleanText(element, 20000) || text;
+    // A search snippet may quote another paper's DOI/PMCID. It is context, not
+    // identity evidence for the result; use destination links and metadata.
+    const values = kind === 'search-result' ? [] : [evidenceText];
     const linkExtractor = window.MDPIFilterLinkExtractor;
     if (kind === 'reference') {
       const configuredValues = linkExtractor?.extractReferenceValues?.(
@@ -142,17 +145,26 @@
         if (/^(?:https?:)?\/\//i.test(value)) addHostname(hostnames, value);
       }
     }
+    // Scholar's canonical title destination precedes PDF mirrors, whose paths
+    // may append .pdf to a DOI (e.g. Springer's /content/pdf/ endpoint).
+    const titleHref = kind === 'search-result' && location.hostname === 'scholar.google.com'
+      ? element.querySelector?.('.gs_rt a[href]')?.getAttribute('href')
+      : null;
+    const links = Array.from(element.querySelectorAll?.('a[href]') || []);
+    if (titleHref) links.sort((a, b) =>
+      Number(b.getAttribute('href') === titleHref) - Number(a.getAttribute('href') === titleHref));
     for (const attribute of ['data-doi', 'data-article-doi', 'data-reference-doi', DOI_ATTRIBUTE]) {
       const value = element.getAttribute?.(attribute);
       if (value) values.push(value);
     }
-    for (const link of element.querySelectorAll?.('a[href]') || []) {
+    for (const link of links) {
       const href = link.getAttribute('href') || '';
       if (kind === 'search-result' && location.hostname === 'scholar.google.com') {
         try {
           // Scholar's navigation URLs repeat the user's query (scioq/q), which
           // may identify an entirely different work from this result.
-          if (new URL(href, document.baseURI).hostname === location.hostname) continue;
+          const hostname = new URL(href, document.baseURI).hostname;
+          if (hostname === location.hostname || hostname === 'scholar.googleusercontent.com') continue;
         } catch { continue; }
       }
       const linkValue = linkExtractor?.referenceLinkValue?.(href) ?? href;
@@ -166,7 +178,7 @@
       confidence: 'exact'
     });
     evidence.profileSignals = window.MDPIFilterItemContentChecker?.publisherHints?.(
-      values[0], element.querySelector?.('[itemprop="isPartOf"] [itemprop="name"],.journal-title')?.textContent
+      evidenceText, element.querySelector?.('[itemprop="isPartOf"] [itemprop="name"],.journal-title')?.textContent
     ) || [];
     return evidence;
   }
