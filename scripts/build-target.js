@@ -156,7 +156,8 @@ function verifyManifestFiles(manifest, destinationDirectory) {
   }
 }
 
-function buildTarget(target, releaseVersionInput) {
+function buildTarget(target, releaseVersionInput, outputRoot = path.join(ROOT, 'dist')) {
+  if (!TARGETS.has(target)) fail(`unsupported target: ${target}`);
   const packageJson = readJson(path.join(ROOT, 'package.json'));
   const baseManifest = readJson(path.join(ROOT, 'manifest.json'));
   const overlay = readJson(path.join(ROOT, 'platforms', target, 'manifest.json'));
@@ -166,7 +167,7 @@ function buildTarget(target, releaseVersionInput) {
   if (releaseVersion !== manifestVersion) manifest.version_name = releaseVersion;
   else delete manifest.version_name;
 
-  const destinationDirectory = path.join(ROOT, 'dist', target);
+  const destinationDirectory = path.join(outputRoot, target);
   fs.rmSync(destinationDirectory, { recursive: true, force: true });
   fs.mkdirSync(destinationDirectory, { recursive: true });
   copyRuntimeFiles(ROOT, destinationDirectory);

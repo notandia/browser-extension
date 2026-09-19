@@ -41,7 +41,8 @@ test('search results without a position attribute retain sequential numbering', 
 
 test('Scholar query navigation cannot assign another paper identity to a result', () => {
   class SourceElement {
-    constructor(links, title = 'A different paper') { this.links = links; this.title = title; }
+    constructor(links, title = 'A different paper') { this.links = links; this.title = title; this.textContent = title; }
+    cloneNode() { return { textContent: this.textContent, querySelectorAll: () => [] }; }
     getAttribute() { return null; }
     querySelector(selector) { return selector === '.gs_rt' && this.title ? { textContent: this.title } : null; }
     querySelectorAll() {

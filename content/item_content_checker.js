@@ -3,6 +3,17 @@ if (typeof window.MDPIFilterItemContentChecker === 'undefined') {
     const M_JOURNALS_STRONG = ['Int J Mol Sci', 'IJMS', 'International Journal of Molecular Sciences'];
     const M_JOURNALS_WEAK = ['Nutrients', 'Molecules', 'Toxins']; // This array includes the "WEAK" selection context
 
+    // Preserve the original journal-name knowledge without inventing a work
+    // identifier. Bare words such as "Molecules" can simply occur in a title;
+    // only use these weaker names when the page labels them as journal metadata.
+    function publisherHints(text, journalName = '') {
+      const strong = M_JOURNALS_STRONG.some(name =>
+        new RegExp(`\\b${escapeRegex(name)}\\b`, 'i').test(String(text || '')));
+      const journal = String(journalName || '').trim().replace(/\.$/, '').toLowerCase();
+      const weak = M_JOURNALS_WEAK.some(name => name.toLowerCase() === journal);
+      return strong || weak ? [{ profileId: 'mdpi', confidence: 'potential', reason: 'journal-name' }] : [];
+    }
+
     const extractDoiFromLinkInternal = (hrefAttribute) => {
       if (!hrefAttribute) return null;
       let targetUrlStr = hrefAttribute; 
@@ -235,6 +246,7 @@ if (typeof window.MDPIFilterItemContentChecker === 'undefined') {
     } // end of checkItemContent
 
     return {
+      publisherHints,
       checkItemContent: checkItemContent,
       extractDoiFromLinkInternal: extractDoiFromLinkInternal
     };

@@ -28,31 +28,42 @@
     const commonSelectors = [
       `a[href="#${refId}"]`,
       `a[href$="#${refId}"]`,
+      // Wikipedia: cite_note bibliography targets.
       `a[href="#cite_note-${withoutCiteNote}"]`,
       `a[href="#ref-${withoutRef}"]`,
       `a[href="#reference-${withoutReference}"]`,
+      // PMC/NCBI: B IDs; Springer: CR IDs; NIH ODS: en IDs.
       `a[href="#B${withoutB}"]`,
       `a[href="#CR${withoutCR}"]`,
       `a[href="#en${withoutEn}"]`,
+      // Taylor & Francis: data-rid / data-bris-rid; Sage: data-xml-rid.
       `a[data-rid="${refId}"]`,
       `a[data-bris-rid="${refId}"]`,
       `a[data-xml-rid="${refId}"]`,
+      // Europe PMC: plain rid attributes.
       `a[rid="${refId}"]`,
+      // Nature: citation-ref anchors target ref-CR bibliography paragraphs.
       `a[data-test="citation-ref"][href$="#ref-${refId}"]`,
+      // Cell: body-ref IDs, aria-controls, and data-db-target-for.
       `a[id="body-ref-${refId}"]`,
       `a[id^="core-${refId}-"]`,
       `a[aria-controls="${refId}"]`,
       `a[data-db-target-for="${refId}"]`,
+      // Oxford University Press: reveal-id / data-open citation popovers.
       `a.link-ref.xref-bibr[reveal-id="${refId}"]`,
       `a.link-ref.xref-bibr[data-open="${refId}"]`,
+      // ScienceDirect: inline links omit the bibliography ref-id- prefix.
       `a[href="#${withoutScienceDirectPrefix}"]`,
+      // Sage: core-collateral and semantic doc-biblioref anchors.
       `a[href="#core-collateral-${refId}"]`,
       `a[role="doc-biblioref"][href="#${refId}"]`,
       `a[role="doc-biblioref"][data-xml-rid="${refId}"]`,
       `a[role="doc-biblioref"][href="#core-collateral-${refId}"]`,
+      // Medicine (LWW): ejp-citation-link identifies the reference via data.
       `a.ejp-citation-link[data-reference-links="${refId}"]`
     ];
 
+    // The same publisher layouts also occur inside superscript footnotes.
     const supSelectors = [
       `sup a[href="#${refId}"]`,
       `sup a[href$="#${refId}"]`,
@@ -82,6 +93,7 @@
       `sup a.ejp-citation-link[data-reference-links="${refId}"]`
     ];
 
+    // ScienceDirect: preserve both bb... and bbb... target variants.
     if (refId.startsWith('ref-id-b')) {
       const base = refId.slice('ref-id-'.length);
       commonSelectors.push(
@@ -136,6 +148,8 @@
       );
     }
 
+    // Wiley: the list-item DOM ID and inline data-bib-id target can differ.
+    // Keep both mappings, including references that only have data-bib-id.
     const listItem = document.getElementById(refId);
     const wileyBibId = normalizeReferenceId(listItem?.getAttribute('data-bib-id'));
     if (wileyBibId && wileyBibId !== refId) {

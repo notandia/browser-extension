@@ -26,7 +26,9 @@
   function profileEvidence(record) {
     return {
       dois: Array.from(record?.evidence?.dois || []),
-      hostnames: Array.from(record?.evidence?.hostnames || [])
+      hostnames: Array.from(record?.evidence?.hostnames || []),
+      // Resolved DOI evidence takes priority over journal-name heuristics.
+      profileSignals: record?.doi ? [] : Array.from(record?.evidence?.profileSignals || [])
     };
   }
 

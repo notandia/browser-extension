@@ -90,6 +90,8 @@
   }
 
   function addHostname(set, value) {
+    // In-page footnote backlinks describe navigation, not the cited publisher.
+    if (!String(value || '').trim() || String(value).trim().startsWith('#')) return;
     try {
       const url = new URL(String(value || ''), document.baseURI);
       if (!/^https?:$/.test(url.protocol)) return;
@@ -127,7 +129,19 @@
 
   function evidenceFromElement(element, text = cleanText(element), kind = 'reference') {
     const hostnames = new Set();
-    const values = [text];
+    // The 500-character popup excerpt is not an identity-extraction limit: a
+    // long author list can put the DOI at the end of a perfectly valid citation.
+    const values = [cleanText(element, 20000) || text];
+    const linkExtractor = window.MDPIFilterLinkExtractor;
+    if (kind === 'reference') {
+      const configuredValues = linkExtractor?.extractReferenceValues?.(
+        element, window.MDPIFilterLinkExtractionSelectors
+      ) || [];
+      values.push(...configuredValues);
+      for (const value of configuredValues) {
+        if (/^(?:https?:)?\/\//i.test(value)) addHostname(hostnames, value);
+      }
+    }
     for (const attribute of ['data-doi', 'data-article-doi', 'data-reference-doi', DOI_ATTRIBUTE]) {
       const value = element.getAttribute?.(attribute);
       if (value) values.push(value);
@@ -141,15 +155,20 @@
           if (new URL(href, document.baseURI).hostname === location.hostname) continue;
         } catch { continue; }
       }
-      values.push(href, link.getAttribute('data-doi') || '');
+      const linkValue = linkExtractor?.referenceLinkValue?.(href) ?? href;
+      values.push(linkValue, link.getAttribute('data-doi') || '');
       addEuropePmcIdentifierValue(values, href);
-      addHostname(hostnames, href);
+      if (linkValue === href) addHostname(hostnames, href);
     }
-    return evidenceFromValues(values, hostnames, {
+    const evidence = evidenceFromValues(values, hostnames, {
       source: 'notandia-source-context',
       method: 'page-evidence',
       confidence: 'exact'
     });
+    evidence.profileSignals = window.MDPIFilterItemContentChecker?.publisherHints?.(
+      values[0], element.querySelector?.('[itemprop="isPartOf"] [itemprop="name"],.journal-title')?.textContent
+    ) || [];
+    return evidence;
   }
 
   function currentArticleEvidence() {
@@ -176,6 +195,16 @@
   }
 
   function safeRecordId(element, index, kind) {
+    // Reuse the original site-aware ID mapping (Nature, Frontiers, Wiley,
+    // ScienceDirect, BMJ, OUP) for popup navigation and inline footnotes alike.
+    if (kind === 'reference' && window.MDPIFilterReferenceIdExtractor?.extractInternalScrollId) {
+      const result = window.MDPIFilterReferenceIdExtractor.extractInternalScrollId(element, index);
+      if (SAFE_ID.test(result.extractedId)) {
+        element.setAttribute(REFERENCE_ID_ATTRIBUTE, result.extractedId);
+        element.setAttribute(LEGACY_REFERENCE_ID_ATTRIBUTE, result.extractedId);
+        return result.extractedId;
+      }
+    }
     const existing = element.dataset?.notandiaRefId ||
       element.dataset?.mdpiFilterRefId ||
       element.id ||
@@ -356,7 +385,10 @@
         'a[href*="pmc.ncbi.nlm.nih.gov"]',
         'a[href*="europepmc.org/article/"]',
         '[data-doi]',
-        '[data-reference-doi]'
+        '[data-reference-doi]',
+        '[data-article-doi]',
+        'div.extra-links > span.data-doi', // Wiley hidden DOI metadata
+        '.Z3988[title]' // Wikipedia/COinS metadata
       ].join(',');
       if (node.matches(evidenceSelector)) return true;
       return Boolean(node.querySelector(evidenceSelector));

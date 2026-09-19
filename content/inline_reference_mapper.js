@@ -45,10 +45,15 @@
     if (!element) return normalizedFallback;
 
     const candidates = [
+      // Nature bibliography paragraphs (the enclosing li may have no ID).
       element.querySelector?.('p.c-article-references__text[id]')?.id,
+      // Frontiers: inline links can target the anchor name rather than its ID.
+      element.querySelector?.('a[name][id]')?.getAttribute?.('name'),
       element.querySelector?.('a[name][id]')?.id,
+      // ScienceDirect reference labels and older reference spans.
       element.querySelector?.('span.label a.anchor[id^="ref-id-b"]')?.id,
       element.querySelector?.('span.reference[id^="rf"]')?.id,
+      // BMJ reverse-reference anchors.
       element.querySelector?.('a.rev-xref-ref[id^="ref-"]')?.id,
       ...structuredAncestorIds(element),
       element.id,

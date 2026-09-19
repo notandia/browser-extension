@@ -15,6 +15,39 @@
     return h === domain || h.endsWith('.' + domain);
   }
 
+  // Wiley linkouts may contain both the citing article's DOI and the cited
+  // work's refDoi/key. Only the latter identifies this bibliography entry.
+  function referenceLinkValue(value) {
+    try {
+      const url = new URL(value, document.baseURI);
+      if (/(^|\.)wiley\.com$/i.test(url.hostname) && url.pathname === '/servlet/linkout') {
+        return url.searchParams.get('refDoi') || url.searchParams.get('key') || '';
+      }
+    } catch {}
+    return value;
+  }
+
+  // Share the accumulated publisher-specific extraction rules with both the
+  // watchlist and formal-integrity scanners. Reading evidence must not expand
+  // accordions; secure_message_handler reveals a reference when navigated to.
+  function extractReferenceValues(itemElement, linkSelectors) {
+    const values = [];
+    for (const config of linkSelectors || []) {
+      for (const element of itemElement.querySelectorAll(config.selector)) {
+        const attribute = config.attribute || 'href';
+        let value = attribute === 'text' ? element.textContent : element.getAttribute(attribute);
+        // Wikipedia COinS stores percent-encoded OpenURL fields in title.
+        if (attribute === 'title' && element.matches('.Z3988')) {
+          values.push(...new URLSearchParams(value || '').getAll('rft_id'));
+          continue;
+        }
+        if (config.textPattern && value) value = value.match(config.textPattern)?.[0];
+        if (value) values.push(attribute === 'href' ? referenceLinkValue(value.trim()) : value.trim());
+      }
+    }
+    return [...new Set(values.filter(Boolean))];
+  }
+
   /**
    * Extracts the primary link (DOI or other) from a reference item element.
    * It also handles expanding accordions on Wiley and Healthline if necessary.
@@ -123,6 +156,8 @@
   }
 
   window.MDPIFilterLinkExtractor = {
+    extractReferenceValues,
+    referenceLinkValue,
     extractPrimaryLink: extractPrimaryLink,
     resetExpansionFlags: resetExpansionFlags // Expose reset function
   };
