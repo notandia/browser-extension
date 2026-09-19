@@ -40,6 +40,8 @@
       itemElement.getAttribute('content-id'),
       itemElement.getAttribute('data-legacy-id'),
       itemElement.dataset?.bibId,
+      itemElement.getAttribute('data-reference-id'),
+      itemElement.dataset?.notandiaRefId,
       itemElement.dataset?.mdpiFilterRefId
     );
 

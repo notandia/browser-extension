@@ -2,7 +2,10 @@
 (function() {
   // Expose the array on the window object so it can be accessed by other scripts.
   window.MDPIFilterLinkExtractionSelectors = [
-    { selector: 'a[data-doi]', type: 'doi' },
+    { selector: '[data-doi]', type: 'doi', attribute: 'data-doi' }, // Citation metadata, including anchors without href
+    { selector: '[data-article-doi]', type: 'doi', attribute: 'data-article-doi' },
+    { selector: '[data-reference-doi]', type: 'doi', attribute: 'data-reference-doi' },
+    { selector: '.Z3988[title]', type: 'text', attribute: 'title' }, // Wikipedia/COinS OpenURL citation metadata
     { selector: 'a[href*="doi.org"]', type: 'doi' },
     { selector: 'a[href*="/10."]', type: 'doi' },
     // --- START Wiley Specific Selector for hidden DOI in span ---
@@ -32,7 +35,7 @@
     { selector: 'p > a[href]', type: 'generic' }, // First link in a paragraph (generic)
     // 'a[href^="http"]:not([href*="#"])', // This is very generic, used as a fallback in link_extractor.js
                                         // Keep it commented out here to avoid it being preferred too early.
-    { selector: '.c-article-references__text a[href]', type: 'generic' }, // Link within reference text (e.g. Wiley)
+    { selector: '.c-article-references__text a[href]', type: 'generic' }, // Nature reference text
     { selector: '.citation__title a[href]', type: 'generic' }, // Link on citation title
     { selector: '.hlFld-Fulltext > a[href]', type: 'generic' } // e.g. Taylor & Francis
     // Add more as needed

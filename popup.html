@@ -13,8 +13,15 @@
         <img src="icons/icon-48.png" alt="" class="brand-icon">
         <div><h1>Notandia</h1><p>Scholarly context worth noticing</p></div>
       </div>
-      <button id="settingsIcon" class="icon-button" type="button" aria-label="Open quick settings" aria-expanded="false">⚙</button>
+      <button id="settingsIcon" class="icon-button" type="button" aria-label="Open quick settings" aria-expanded="false"><span class="settings-glyph" aria-hidden="true">⚙</span><span class="settings-label">Settings</span></button>
     </header>
+
+    <aside id="pinTip" class="pin-tip" aria-label="Toolbar shortcut" hidden>
+      <details><summary>Pin Notandia for quick access</summary>
+      <p>Pin Notandia to your toolbar to open reference checks in one click.</p>
+      <p id="pinInstructions">Open your browser’s Extensions menu, find Notandia, and choose Pin to toolbar.</p>
+      <button id="dismissPinTip" class="text-button" type="button">Don’t show again</button></details>
+    </aside>
 
     <section id="settingsPanel" class="settings-panel" aria-label="Quick settings">
       <div class="settings-heading"><strong>Publisher watchlist</strong><button id="managePublishers" type="button" class="text-button">Manage publishers</button></div>
@@ -97,6 +104,7 @@
     </details>
   </main>
   <script src="shared/publisher_profiles.js"></script>
+  <script src="popup_pin_tip.js"></script>
   <script src="popup.js"></script>
   <script src="popup_overview.js"></script>
   <script src="popup_progress.js"></script>

@@ -3,36 +3,35 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const os = require('node:os');
+const { buildTarget } = require('../scripts/build-target');
 const test = require('node:test');
 
 const ROOT = path.resolve(__dirname, '..');
-const DIST = path.join(ROOT, 'dist');
-
-function readManifest(target) {
+function readManifest(DIST, target) {
   return JSON.parse(fs.readFileSync(path.join(DIST, target, 'manifest.json'), 'utf8'));
 }
 
 test('one source tree generates isolated Notandia browser packages', () => {
-  fs.rmSync(DIST, { recursive: true, force: true });
+  // Chrome may be running the unpacked development build in ROOT/dist.
+  // Tests must never replace or remove that installed copy.
+  const DIST = fs.mkdtempSync(path.join(os.tmpdir(), 'notandia-packaging-test-'));
+  const installedManifest = path.join(ROOT, 'dist', 'chrome', 'manifest.json');
+  const before = fs.existsSync(installedManifest) ? fs.readFileSync(installedManifest, 'utf8') : null;
+  const fixtureDirectory = fs.mkdtempSync(path.join(ROOT, 'packaging-fixture-'));
+  fs.writeFileSync(path.join(fixtureDirectory, 'local-notes.txt'), 'Must not ship');
   try {
-    const result = spawnSync(process.execPath, [
-      path.join(ROOT, 'scripts', 'build-all.js'),
-      '--version',
-      '1.2.3-beta.1'
-    ], { cwd: ROOT, encoding: 'utf8' });
-
-    assert.equal(result.status, 0, result.stderr || result.stdout);
+    for (const target of ['chrome', 'edge', 'firefox', 'safari']) buildTarget(target, '1.2.3-beta.1', DIST);
 
     const locale = JSON.parse(
       fs.readFileSync(path.join(ROOT, '_locales', 'en', 'messages.json'), 'utf8')
     );
     assert.equal(locale.extName.message, 'Notandia');
 
-    const chrome = readManifest('chrome');
-    const edge = readManifest('edge');
-    const firefox = readManifest('firefox');
-    const safari = readManifest('safari');
+    const chrome = readManifest(DIST, 'chrome');
+    const edge = readManifest(DIST, 'edge');
+    const firefox = readManifest(DIST, 'firefox');
+    const safari = readManifest(DIST, 'safari');
 
     for (const manifest of [chrome, edge, firefox, safari]) {
       assert.equal(manifest.version, '1.2.3');
@@ -104,8 +103,12 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'content_script.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'scripts')), false);
       assert.equal(fs.existsSync(path.join(DIST, target, 'tests')), false);
+      assert.equal(fs.existsSync(path.join(DIST, target, '.vscode')), false);
+      assert.equal(fs.existsSync(path.join(DIST, target, path.basename(fixtureDirectory))), false);
     }
   } finally {
+    fs.rmSync(fixtureDirectory, { recursive: true, force: true });
     fs.rmSync(DIST, { recursive: true, force: true });
+    assert.equal(fs.existsSync(installedManifest) ? fs.readFileSync(installedManifest, 'utf8') : null, before);
   }
 });

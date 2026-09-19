@@ -9,5 +9,8 @@
     "verify": "node scripts/verify-extension.js",
     "test": "node scripts/verify-extension.js && node --test tests/*.test.js"
   },
-  "license": "AGPL-3.0-or-later"
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "linkedom": "^0.18.13"
+  }
 }

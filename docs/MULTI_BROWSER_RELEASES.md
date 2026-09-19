@@ -25,17 +25,19 @@ The following has been tested in pull-request CI:
 - generation of all four unpacked browser targets;
 - generated manifest and runtime-file verification.
 
-The following has **not** yet been tested end to end:
+The GitHub-only release path was exercised by [run 30155660868](https://github.com/notandia/browser-extension/actions/runs/30155660868) for commit `d41dc02d733734c0b9bfea401d7b4856feaf7c5b`. The [v0.1.0-rc.1 prerelease](https://github.com/notandia/browser-extension/releases/tag/v0.1.0-rc.1) contains all four target ZIPs and `checksums.txt`. These July artifacts predate the subsequent runtime changes and are not the current release candidate.
 
-- creating release assets from an actual version tag;
-- creating the corresponding GitHub release and checksum inventory;
+The following has **not** yet been demonstrated end to end:
+
 - downloading those release assets in the protected publication workflow;
 - signing and uploading a Chrome CRX through the Chrome Web Store API;
 - uploading or submitting an Edge package through Partner Center;
 - signing or submitting the first Firefox package through AMO;
 - protected-environment approvals during real store jobs.
 
-Do not describe the tag-release or store-publication workflows as working until those paths have been exercised with the release-candidate and stable-release process.
+The previous [store workflow attempt](https://github.com/notandia/browser-extension/actions/runs/30004805606) failed before any job steps ran: GitHub reported that the deployment was rejected or did not satisfy protection rules. This is not evidence of a store API upload attempt. Required reviewers must approve a future eligible deployment; do not remove the protection rules to get past it.
+
+Do not describe store publication as operational until the draft-upload and submission paths have been exercised. See the [September release-readiness audit](RELEASE_READINESS_2026-09-19.md) for the remaining gates.
 
 ## Stable and prerelease versions
 

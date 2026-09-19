@@ -68,6 +68,7 @@
         "content/reference_id_extractor.js",
         "content/ncbi_fetch_proxy.js",
         "content/ncbi_api_handler.js",
+        "content/source_context.js",
         "content/reference_counter_normalizer.js",
         "content/publisher_profile_scanner.js",
         "content/secure_message_handler.js",

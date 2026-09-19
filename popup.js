@@ -222,7 +222,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setIntegrityCounts() {
-    const counts = integrityReport?.summary?.counts || {};
+    // Count the same distinct works offered by the reference list. The current
+    // article has its own section and must not inflate reference filter totals.
+    const worksByStatus = new Map();
+    for (const record of integrityReport?.records || []) {
+      if (record.kind === 'current-article' || !record.primaryStatus) continue;
+      const statuses = new Set([record.primaryStatus, ...uniqueIntegrityEvents(record.events).map(event => event.status)]);
+      for (const status of statuses) {
+        if (!worksByStatus.has(status)) worksByStatus.set(status, new Set());
+        worksByStatus.get(status).add(recordKey(record));
+      }
+    }
+    const counts = Object.fromEntries(Array.from(worksByStatus, ([status, works]) => [status, works.size]));
     for (const [status, id] of Object.entries(countIds)) {
       const count = Number(counts[status]) || 0;
       const node = $(id);
@@ -411,6 +422,10 @@ document.addEventListener('DOMContentLoaded', () => {
   el.settings.addEventListener('click', () => {
     const open = el.panel.classList.toggle('open');
     el.settings.setAttribute('aria-expanded', String(open));
+    el.settings.setAttribute('aria-label', open ? 'Back to results' : 'Open quick settings');
+    el.settings.querySelector('.settings-glyph').textContent = open ? '←' : '⚙';
+    el.settings.querySelector('.settings-label').textContent = open ? 'Results' : 'Settings';
+    document.querySelector('.container').classList.toggle('settings-open', open);
   });
   el.manage.addEventListener('click', () => chrome.runtime.openOptionsPage());
   el.rescan.addEventListener('click', forceRescan);

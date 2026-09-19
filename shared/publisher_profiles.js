@@ -166,8 +166,15 @@
         break;
       }
     }
-    if (!reasons.length) return null;
-    const confidence = 'confirmed';
+    let confidence = 'confirmed';
+    if (!reasons.length) {
+      const journalHint = normalized.id === 'mdpi' && normalized.source === 'builtin' &&
+        Array.isArray(evidence.profileSignals) && evidence.profileSignals.some(signal => signal?.profileId === 'mdpi' &&
+          signal.confidence === 'potential' && signal.reason === 'journal-name');
+      if (!journalHint) return null;
+      reasons.push('journal-name');
+      confidence = 'potential';
+    }
     if (confidence === 'potential' && normalized.confidencePolicy !== 'confirmed-and-potential') return null;
     return {
       profileId: normalized.id,

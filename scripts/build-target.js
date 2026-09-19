@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
 const TARGETS = new Set(['chrome', 'edge', 'firefox', 'safari']);
+const RUNTIME_DIRECTORIES = new Set(['_locales', 'content', 'icons', 'shared']);
 const OMIT_TOP_LEVEL = new Set([
   '.git',
   '.github',
@@ -79,6 +80,8 @@ function normalizeVersion(input, fallback) {
 function shouldOmit(relativePath) {
   const normalized = relativePath.split(path.sep).join('/');
   const [topLevel] = normalized.split('/');
+  if (normalized.split('/').some(part => part.startsWith('.'))) return true;
+  if (normalized.includes('/') && !RUNTIME_DIRECTORIES.has(topLevel)) return true;
   if (OMIT_TOP_LEVEL.has(topLevel)) return true;
   if (!normalized.includes('/') && OMIT_ROOT_FILES.has(normalized)) return true;
   if (normalized === 'manifest.json') return true;
@@ -88,6 +91,7 @@ function shouldOmit(relativePath) {
 function copyRuntimeFiles(sourceDirectory, destinationDirectory, relativeDirectory = '') {
   for (const entry of fs.readdirSync(sourceDirectory, { withFileTypes: true })) {
     const relativePath = path.join(relativeDirectory, entry.name);
+    if (!relativeDirectory && entry.isDirectory() && !RUNTIME_DIRECTORIES.has(entry.name)) continue;
     if (shouldOmit(relativePath)) continue;
     const sourcePath = path.join(sourceDirectory, entry.name);
     const destinationPath = path.join(destinationDirectory, relativePath);
@@ -152,7 +156,8 @@ function verifyManifestFiles(manifest, destinationDirectory) {
   }
 }
 
-function buildTarget(target, releaseVersionInput) {
+function buildTarget(target, releaseVersionInput, outputRoot = path.join(ROOT, 'dist')) {
+  if (!TARGETS.has(target)) fail(`unsupported target: ${target}`);
   const packageJson = readJson(path.join(ROOT, 'package.json'));
   const baseManifest = readJson(path.join(ROOT, 'manifest.json'));
   const overlay = readJson(path.join(ROOT, 'platforms', target, 'manifest.json'));
@@ -162,7 +167,7 @@ function buildTarget(target, releaseVersionInput) {
   if (releaseVersion !== manifestVersion) manifest.version_name = releaseVersion;
   else delete manifest.version_name;
 
-  const destinationDirectory = path.join(ROOT, 'dist', target);
+  const destinationDirectory = path.join(outputRoot, target);
   fs.rmSync(destinationDirectory, { recursive: true, force: true });
   fs.mkdirSync(destinationDirectory, { recursive: true });
   copyRuntimeFiles(ROOT, destinationDirectory);

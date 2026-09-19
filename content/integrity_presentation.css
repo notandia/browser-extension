@@ -22,7 +22,7 @@ html body .notandia-publisher-badges {
   padding: 0 !important;
   float: none !important;
   transform: none !important;
-  font: 600 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font: 600 12px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
   white-space: normal !important;
   isolation: isolate !important;
 }
@@ -42,7 +42,7 @@ html body .notandia-publisher-badge {
   border-radius: 999px !important;
   color: var(--notandia-profile-color, #48627A) !important;
   background: #fff !important;
-  font: 700 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font: 700 12px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
   letter-spacing: 0 !important;
   white-space: nowrap !important;
   text-transform: none !important;
@@ -58,7 +58,7 @@ html body .notandia-publisher-badge {
   border-radius: 999px !important;
   color: var(--notandia-integrity-color, #B42318) !important;
   background: #fff !important;
-  font: 700 11px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font: 700 12px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
   letter-spacing: 0 !important;
   text-transform: none !important;
 }
