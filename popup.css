@@ -57,6 +57,10 @@ button:hover { filter: brightness(0.985); }
 button.secondary { background: #e6edf3; color: var(--ink); }
 button.text-button { background: transparent; color: #2b5c88; padding: 3px 4px; }
 .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
@@ -294,3 +298,5 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .quick-profile label { display: flex; align-items: center; gap: 8px; }
 .quick-profile input[type="color"] { width: 44px; height: 40px; padding: 3px; border: 1px solid var(--line-strong); border-radius: 6px; }
 .quick-profile select { min-height: 40px; }
+
+.settings-glyph { font-family: "Arial", sans-serif; font-size: 26px; line-height: 1; flex: 0 0 auto; }
