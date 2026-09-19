@@ -43,6 +43,9 @@
   }
 
   function referenceNodes(limit = 300) {
+    // Search cards can match legacy bibliography fallbacks (li IDs containing
+    // "r", for example). A search result must never become a second reference.
+    if (activeSearchConfig()) return [];
     const selector = configuredReferenceSelector();
     let nodes = [];
     if (selector) {
@@ -67,16 +70,55 @@
   }
 
   function searchNodes(limit = 150) {
+    const config = activeSearchConfig();
     const selector = configuredSearchSelector();
     if (!selector) return [];
     try {
-      return dedupeNodes(Array.from(document.querySelectorAll(selector)))
+      const nodes = dedupeNodes(Array.from(document.querySelectorAll(selector)))
         // Scholar also uses gs_r for its "See all results" / related-search UI.
         .filter(node => location.hostname !== 'scholar.google.com' || node.querySelector('.gs_rt'))
+        .filter(node => !config?.titleLinkSelector || searchLinks(node, config).length)
+        // Google AI answers and question modules contain citations to multiple
+        // sources. Their container is not itself a publisher's search result.
+        .filter(node => !config?.isGoogleWeb || !node.querySelector('[data-aim]'));
+      return nodes.filter(node => !nodes.some(other => other !== node && node.contains(other)))
         .slice(0, Math.max(0, limit));
     } catch {
       return [];
     }
+  }
+
+  function searchDestination(href, config) {
+    try {
+      let url = new URL(href, document.baseURI);
+      if (!/^https?:$/.test(url.protocol)) return null;
+      if (url.hostname === location.hostname) {
+        if (config?.isGoogleWeb && url.pathname === '/url') {
+          url = new URL(url.searchParams.get('url') || url.searchParams.get('q'));
+        } else if (config?.isDuckDuckGo && url.searchParams.has('uddg')) {
+          url = new URL(url.searchParams.get('uddg'));
+        } else if (config?.isBingWeb && url.pathname === '/ck/a') {
+          const encoded = url.searchParams.get('u') || '';
+          if (!encoded.startsWith('a1')) return null;
+          url = new URL(atob(encoded.slice(2).replace(/-/g, '+').replace(/_/g, '/')));
+        } else if (config?.host !== 'pubmed.ncbi.nlm.nih.gov' && config !== window.MDPIFilterDomains?.europepmc) {
+          return null;
+        }
+      }
+      if (!/^https?:$/.test(url.protocol) || url.hostname === 'scholar.googleusercontent.com') return null;
+      // Search tracking/query parameters may mention a different paper.
+      url.search = '';
+      url.hash = '';
+      return url.href;
+    } catch { return null; }
+  }
+
+  function searchLinks(element, config = activeSearchConfig()) {
+    const primarySelector = config?.titleLinkSelector || (location.hostname === 'scholar.google.com' ? '.gs_rt a[href]' : 'h2 a[href], h3 a[href], a[href]:has(h3)');
+    const primary = Array.from(element.querySelectorAll?.(primarySelector) || []).slice(0, 1);
+    const alternate = config?.alternateLinkSelector
+      ? Array.from(element.querySelectorAll(config.alternateLinkSelector)) : [];
+    return [...new Set([...primary, ...alternate])].filter(link => searchDestination(link.getAttribute('href'), config));
   }
 
   function cleanText(element, maxLength = 500) {
@@ -147,18 +189,22 @@
     }
     // Scholar's canonical title destination precedes PDF mirrors, whose paths
     // may append .pdf to a DOI (e.g. Springer's /content/pdf/ endpoint).
-    const titleHref = kind === 'search-result' && location.hostname === 'scholar.google.com'
-      ? element.querySelector?.('.gs_rt a[href]')?.getAttribute('href')
-      : null;
-    const links = Array.from(element.querySelectorAll?.('a[href]') || []);
-    if (titleHref) links.sort((a, b) =>
-      Number(b.getAttribute('href') === titleHref) - Number(a.getAttribute('href') === titleHref));
+    const searchConfig = activeSearchConfig();
+    const links = kind === 'search-result' ? searchLinks(element, searchConfig)
+      : Array.from(element.querySelectorAll?.('a[href]') || []);
+    if (kind === 'search-result' && searchConfig?.identityMetadataSelector) {
+      for (const metadata of element.querySelectorAll(searchConfig.identityMetadataSelector)) values.push(cleanText(metadata, 2000));
+    }
     for (const attribute of ['data-doi', 'data-article-doi', 'data-reference-doi', DOI_ATTRIBUTE]) {
+      // Search engines reuse cards as queries change; our previous resolution
+      // cannot be evidence for the new destination in that same DOM element.
+      if (kind === 'search-result' && attribute === DOI_ATTRIBUTE) continue;
       const value = element.getAttribute?.(attribute);
       if (value) values.push(value);
     }
     for (const link of links) {
-      const href = link.getAttribute('href') || '';
+      const href = kind === 'search-result' ? searchDestination(link.getAttribute('href'), searchConfig) : link.getAttribute('href') || '';
+      if (!href) continue;
       if (kind === 'search-result' && location.hostname === 'scholar.google.com') {
         try {
           // Scholar's navigation URLs repeat the user's query (scioq/q), which
@@ -177,13 +223,15 @@
       method: 'page-evidence',
       confidence: 'exact'
     });
-    evidence.profileSignals = window.MDPIFilterItemContentChecker?.publisherHints?.(
+    evidence.profileSignals = kind === 'search-result' ? [] : window.MDPIFilterItemContentChecker?.publisherHints?.(
       evidenceText, element.querySelector?.('[itemprop="isPartOf"] [itemprop="name"],.journal-title')?.textContent
     ) || [];
     return evidence;
   }
 
   function currentArticleEvidence() {
+    // A search URL describes a query, not a current scholarly article.
+    if (activeSearchConfig()) return evidenceFromValues([], new Set(), { source: 'notandia-source-context', method: 'search-page' });
     const hostnames = new Set([location.hostname.toLowerCase().replace(/^www\./, '')]);
     const values = [];
     for (const selector of [
@@ -266,7 +314,7 @@
 
   function titleFromElement(element, text) {
     const candidate = element.querySelector?.(
-      'h3, [role="heading"], [data-crb-snippet-text], .gs_rt, .gpZmoc, .otQkpb'
+      'h2, h3, .docsum-title, [role="heading"], [data-crb-snippet-text], .gs_rt, .gpZmoc, .otQkpb'
     )?.textContent || text;
     return String(candidate || '').replace(/[\s\u00a0]+/g, ' ').trim().slice(0, 300);
   }
@@ -383,12 +431,13 @@
   }
 
   function nodeTouchesSourceContext(node) {
+    if (!(node instanceof Element)) node = node?.parentElement;
     if (!(node instanceof Element)) return false;
     if (node.matches(OWN_NODE_SELECTOR) || node.closest(OWN_NODE_SELECTOR)) return false;
     const selectors = [configuredReferenceSelector(), configuredSearchSelector()].filter(Boolean);
     try {
       for (const selector of selectors) {
-        if (node.matches(selector) || node.querySelector(selector)) return true;
+        if (node.matches(selector) || node.closest(selector) || node.querySelector(selector)) return true;
       }
       const evidenceSelector = [
         'a[href*="doi.org"]',

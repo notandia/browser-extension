@@ -116,6 +116,10 @@
   observer = new MutationObserver(mutations => {
     if (!runtime.isAvailable()) return stop();
     for (const mutation of mutations) {
+      if (mutation.type !== 'childList' && sourceContext.nodeTouchesSourceContext(mutation.target)) {
+        scheduleScan(350);
+        return;
+      }
       for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) {
         if (sourceContext.nodeTouchesSourceContext(node)) {
           scheduleScan(350);
@@ -124,5 +128,6 @@
       }
     }
   });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true,
+    attributes: true, attributeFilter: ['href', 'data-doi', 'data-article-doi', 'data-reference-doi'] });
 })();

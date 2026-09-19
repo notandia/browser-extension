@@ -67,6 +67,11 @@
       element.hasAttribute?.(SIGNATURE_ATTRIBUTE) ||
       Boolean(element.querySelector?.(':scope > .notandia-publisher-badges'));
     if (!hasManagedState) return;
+    if (!originalStyles.has(element) && element.hasAttribute(STYLE_ATTRIBUTE)) {
+      // A previous extension injection may have left its own style markers.
+      // The WeakMap does not survive reload; remove only properties we manage.
+      for (const property of STYLE_PROPERTIES) element.style.removeProperty(property);
+    }
     restoreOriginalStyles(element);
     element.querySelectorAll?.(':scope > .notandia-publisher-badges').forEach(node => node.remove());
     element.removeAttribute(STYLE_ATTRIBUTE);
@@ -206,7 +211,8 @@
 
     for (const record of all) record.matches = api.matchProfiles(settings, profileEvidence(record));
     const allElements = new Set(all.map(record => record.element));
-    for (const element of Array.from(managedElements)) {
+    const previousElements = new Set([...managedElements, ...document.querySelectorAll(`[${STYLE_ATTRIBUTE}]`)]);
+    for (const element of previousElements) {
       if (!allElements.has(element)) clearProfileStyle(element);
     }
 
@@ -300,10 +306,12 @@
   loadSettings();
   const observer = new MutationObserver(mutations => {
     if (mutations.some(mutation =>
+      (mutation.type !== 'childList' && sourceContext.nodeTouchesSourceContext(mutation.target)) ||
       Array.from(mutation.addedNodes).some(sourceContext.nodeTouchesSourceContext) ||
       Array.from(mutation.removedNodes).some(sourceContext.nodeTouchesSourceContext)
     )) scheduleScan(500);
   });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true,
+    attributes: true, attributeFilter: ['href', 'data-doi', 'data-article-doi', 'data-reference-doi'] });
   setTimeout(() => scheduleScan(0), 1800);
 })();
