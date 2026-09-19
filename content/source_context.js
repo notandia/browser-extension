@@ -208,8 +208,9 @@
   function searchResultNumber(element, index) {
     const direct = positiveNumber(element.getAttribute?.('data-rpos'));
     if (direct) return direct;
-    const zeroBased = Number(element.getAttribute?.('data-rp'));
-    if (Number.isFinite(zeroBased) && zeroBased >= 0) return zeroBased + 1;
+    const position = element.getAttribute?.('data-rp');
+    const zeroBased = Number(position);
+    if (position != null && /^\d+$/.test(position) && Number.isSafeInteger(zeroBased)) return zeroBased + 1;
     return index + 1;
   }
 
