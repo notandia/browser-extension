@@ -123,3 +123,22 @@ test('current integrity presentation stops after extension reload invalidates it
   assert.match(presentation, /runtime\.sendMessage\(\{ type: 'getIntegrityReport' \}/);
   assert.match(scanner, /runtime\.storageGet\([\s\S]*'sync'/);
 });
+
+
+test('reference filter totals exclude the current article and deduplicate works and notices', () => {
+  const vm = require('node:vm');
+  const popup = source('popup.js');
+  const fn = popup.slice(popup.indexOf('  function setIntegrityCounts()'), popup.indexOf('  function recordKey('));
+  const nodes = Object.fromEntries(['retracted', 'corrected'].map(status => [status, { closest: () => null }]));
+  const record = { kind: 'reference', doi: '10.1234/work', primaryStatus: 'retracted', events: [{ status: 'corrected' }, { status: 'corrected' }] };
+  vm.runInNewContext(fn + '\nsetIntegrityCounts();', {
+    integrityReport: { records: [record, { ...record }, { kind: 'current-article', doi: '10.1234/article', primaryStatus: 'corrected' }] },
+    countIds: { retracted: 'retracted', corrected: 'corrected' },
+    recordKey: record => record.doi,
+    uniqueIntegrityEvents: events => events || [],
+    $: id => nodes[id],
+    el: { contextFilter: { value: 'all' }, integrity: { checked: false }, integrityCoverage: {} }
+  });
+  assert.equal(nodes.retracted.textContent, '1');
+  assert.equal(nodes.corrected.textContent, '1');
+});
