@@ -1,0 +1,6 @@
+/dist/
+/release-assets/
+/downloaded/
+/firefox-source/
+/node_modules/
+.DS_Store

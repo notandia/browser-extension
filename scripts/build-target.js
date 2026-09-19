@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
 const TARGETS = new Set(['chrome', 'edge', 'firefox', 'safari']);
+const RUNTIME_DIRECTORIES = new Set(['_locales', 'content', 'icons', 'shared']);
 const OMIT_TOP_LEVEL = new Set([
   '.git',
   '.github',
@@ -79,6 +80,8 @@ function normalizeVersion(input, fallback) {
 function shouldOmit(relativePath) {
   const normalized = relativePath.split(path.sep).join('/');
   const [topLevel] = normalized.split('/');
+  if (normalized.split('/').some(part => part.startsWith('.'))) return true;
+  if (normalized.includes('/') && !RUNTIME_DIRECTORIES.has(topLevel)) return true;
   if (OMIT_TOP_LEVEL.has(topLevel)) return true;
   if (!normalized.includes('/') && OMIT_ROOT_FILES.has(normalized)) return true;
   if (normalized === 'manifest.json') return true;
@@ -88,6 +91,7 @@ function shouldOmit(relativePath) {
 function copyRuntimeFiles(sourceDirectory, destinationDirectory, relativeDirectory = '') {
   for (const entry of fs.readdirSync(sourceDirectory, { withFileTypes: true })) {
     const relativePath = path.join(relativeDirectory, entry.name);
+    if (!relativeDirectory && entry.isDirectory() && !RUNTIME_DIRECTORIES.has(entry.name)) continue;
     if (shouldOmit(relativePath)) continue;
     const sourcePath = path.join(sourceDirectory, entry.name);
     const destinationPath = path.join(destinationDirectory, relativePath);

@@ -15,6 +15,8 @@ function readManifest(target) {
 
 test('one source tree generates isolated Notandia browser packages', () => {
   fs.rmSync(DIST, { recursive: true, force: true });
+  const fixtureDirectory = fs.mkdtempSync(path.join(ROOT, 'packaging-fixture-'));
+  fs.writeFileSync(path.join(fixtureDirectory, 'local-notes.txt'), 'Must not ship');
   try {
     const result = spawnSync(process.execPath, [
       path.join(ROOT, 'scripts', 'build-all.js'),
@@ -104,8 +106,11 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(fs.existsSync(path.join(DIST, target, 'content', 'content_script.js')), true);
       assert.equal(fs.existsSync(path.join(DIST, target, 'scripts')), false);
       assert.equal(fs.existsSync(path.join(DIST, target, 'tests')), false);
+      assert.equal(fs.existsSync(path.join(DIST, target, '.vscode')), false);
+      assert.equal(fs.existsSync(path.join(DIST, target, path.basename(fixtureDirectory))), false);
     }
   } finally {
+    fs.rmSync(fixtureDirectory, { recursive: true, force: true });
     fs.rmSync(DIST, { recursive: true, force: true });
   }
 });
