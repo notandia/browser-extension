@@ -22,7 +22,7 @@ test('search results without a position attribute retain sequential numbering', 
     querySelectorAll() { return []; }
     cloneNode() { return this; }
   }
-  const context = { Element: SourceElement, URL };
+  const context = { Element: SourceElement, URL, location: { hostname: 'example.org' } };
   context.window = context;
   vm.createContext(context);
   vm.runInContext(source('shared/work_identifiers.js'), context);
@@ -37,6 +37,38 @@ test('search results without a position attribute retain sequential numbering', 
     assert.equal(record({ 'data-rp': invalid }, 5).number, 6);
   }
   assert.equal(record({ 'data-rpos': '4', 'data-rp': '9' }, 5).number, 4);
+});
+
+test('Scholar query navigation cannot assign another paper identity to a result', () => {
+  class SourceElement {
+    constructor(links, title = 'A different paper') { this.links = links; this.title = title; }
+    getAttribute() { return null; }
+    querySelector(selector) { return selector === '.gs_rt' && this.title ? { textContent: this.title } : null; }
+    querySelectorAll() {
+      return this.links.map(href => ({ getAttribute: name => name === 'href' ? href : null }));
+    }
+  }
+  const relatedLink = '/scholar?q=related:example&scioq=PMC7102549+10.1016/j.ijantimicag.2020.105949';
+  const result = new SourceElement(['https://pmc.ncbi.nlm.nih.gov/articles/PMC7194867/pdf/main.pdf', relatedLink]);
+  const navigation = new SourceElement([relatedLink], '');
+  const context = {
+    Element: SourceElement, URL,
+    location: { hostname: 'scholar.google.com', pathname: '/scholar' },
+    document: { baseURI: 'https://scholar.google.com/scholar?q=PMC7102549', querySelectorAll: () => [result, navigation] },
+    NotandiaDomainUtils: { getActiveSearchConfig: () => ({ itemSelector: 'div.gs_r' }) }
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(source('shared/work_identifiers.js'), context);
+  vm.runInContext(source('content/source_context.js'), context);
+  const api = context.NotandiaSourceContext;
+  const evidence = api.evidenceFromElement(result, result.title, 'search-result');
+  assert.deepEqual(Array.from(evidence.pmcids), ['PMC7194867']);
+  assert.deepEqual(Array.from(evidence.dois), []);
+  assert.deepEqual(Array.from(api.searchNodes()), [result]);
+
+  const direct = new SourceElement(['https://doi.org/10.1007/s13312-020-1852-4', relatedLink]);
+  assert.deepEqual(Array.from(api.evidenceFromElement(direct, direct.title, 'search-result').dois), ['10.1007/s13312-020-1852-4']);
 });
 
 test('publisher and integrity consumers use one source-record pipeline', () => {

@@ -71,6 +71,8 @@
     if (!selector) return [];
     try {
       return dedupeNodes(Array.from(document.querySelectorAll(selector)))
+        // Scholar also uses gs_r for its "See all results" / related-search UI.
+        .filter(node => location.hostname !== 'scholar.google.com' || node.querySelector('.gs_rt'))
         .slice(0, Math.max(0, limit));
     } catch {
       return [];
@@ -123,7 +125,7 @@
     } catch {}
   }
 
-  function evidenceFromElement(element, text = cleanText(element)) {
+  function evidenceFromElement(element, text = cleanText(element), kind = 'reference') {
     const hostnames = new Set();
     const values = [text];
     for (const attribute of ['data-doi', 'data-article-doi', 'data-reference-doi', DOI_ATTRIBUTE]) {
@@ -132,6 +134,13 @@
     }
     for (const link of element.querySelectorAll?.('a[href]') || []) {
       const href = link.getAttribute('href') || '';
+      if (kind === 'search-result' && location.hostname === 'scholar.google.com') {
+        try {
+          // Scholar's navigation URLs repeat the user's query (scioq/q), which
+          // may identify an entirely different work from this result.
+          if (new URL(href, document.baseURI).hostname === location.hostname) continue;
+        } catch { continue; }
+      }
       values.push(href, link.getAttribute('data-doi') || '');
       addEuropePmcIdentifierValue(values, href);
       addHostname(hostnames, href);
@@ -223,7 +232,7 @@
 
   function buildRecord(element, index, kind, maxTextLength = 500) {
     const text = cleanText(element, maxTextLength);
-    const evidence = evidenceFromElement(element, text);
+    const evidence = evidenceFromElement(element, text, kind);
     return {
       element,
       evidence,
