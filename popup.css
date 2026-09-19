@@ -24,10 +24,12 @@
   border: 0;
 }
 
+/* An action popup sizes itself from its document. Do not cap its initial
+   width with viewport units: Chrome can start with a narrow viewport. */
+html { width: 480px; }
 body {
   margin: 0;
   width: 480px;
-  max-width: 100vw;
   max-height: 600px;
   overflow: auto;
   background: #eff4f7;
@@ -41,9 +43,10 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
+  gap: 16px;
   padding: 1px 2px;
 }
-.brand-block { display: flex; align-items: center; gap: 9px; }
+.brand-block { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .brand-icon { width: 34px; height: 34px; border-radius: 9px; }
 .popup-header h1 { margin: 0; font-size: 19px; line-height: 1.08; letter-spacing: -0.02em; }
 .popup-header p { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
@@ -57,11 +60,12 @@ button.text-button { background: transparent; color: #2b5c88; padding: 3px 4px; 
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
-  width: 40px;
-  height: 40px;
-  padding: 0;
+  flex: 0 0 auto;
+  min-width: 108px;
+  min-height: 44px;
+  padding: 8px 12px;
   border-radius: 9px;
-  font-size: 15px;
+  font-size: 16px;
   box-shadow: var(--shadow);
 }
 
@@ -273,3 +277,20 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .pin-tip strong { font-size: 14px; }
 .pin-tip p { margin: 5px 0; color: var(--muted); font-size: 13px; }
 .pin-tip button { margin-top: 4px; }
+
+.section-heading-row > div { min-width: 0; }
+.overview-heading-row > button { flex: 0 0 auto; }
+.settings-heading { flex-wrap: wrap; align-items: center; }
+.quick-profile select { width: 140px; min-width: 0; }
+.quick-profile label { min-width: 0; overflow-wrap: anywhere; }
+.pin-tip summary { cursor: pointer; font-size: 14px; font-weight: 700; }
+.pin-tip { padding: 8px 12px; }
+.pin-tip summary { display: flex; align-items: center; }
+
+/* Settings is a separate view, not another long panel above the results. */
+.container.settings-open > .section,
+.container.settings-open > .report-section,
+.container.settings-open > .pin-tip { display: none; }
+.quick-profile label { display: flex; align-items: center; gap: 8px; }
+.quick-profile input[type="color"] { width: 44px; height: 40px; padding: 3px; border: 1px solid var(--line-strong); border-radius: 6px; }
+.quick-profile select { min-height: 40px; }

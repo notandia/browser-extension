@@ -411,6 +411,9 @@ document.addEventListener('DOMContentLoaded', () => {
   el.settings.addEventListener('click', () => {
     const open = el.panel.classList.toggle('open');
     el.settings.setAttribute('aria-expanded', String(open));
+    el.settings.setAttribute('aria-label', open ? 'Back to results' : 'Open quick settings');
+    el.settings.textContent = open ? '← Results' : '⚙ Settings';
+    document.querySelector('.container').classList.toggle('settings-open', open);
   });
   el.manage.addEventListener('click', () => chrome.runtime.openOptionsPage());
   el.rescan.addEventListener('click', forceRescan);
