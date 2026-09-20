@@ -111,14 +111,18 @@ jobs:
           KEY_PATH="$RUNNER_TEMP/notandia-chrome-private-key.pem"
           OUTPUT_PATH="release-assets/$(basename "${SOURCE_ZIP%.zip}").crx"
           cleanup() {
-            rm -rf "$WORK_DIR" "$KEY_PATH" "$WORK_DIR.crx"
+            rm -rf "$WORK_DIR" "$KEY_PATH" "$KEY_PATH.pkcs8" "$WORK_DIR.crx"
           }
           trap cleanup EXIT
 
-          rm -rf "$WORK_DIR" "$KEY_PATH" "$WORK_DIR.crx" "$OUTPUT_PATH"
+          rm -rf "$WORK_DIR" "$KEY_PATH" "$KEY_PATH.pkcs8" "$WORK_DIR.crx" "$OUTPUT_PATH"
           mkdir -p "$WORK_DIR"
           printf '%s' "$CHROME_CRX_PRIVATE_KEY_B64" | base64 --decode > "$KEY_PATH"
           chmod 600 "$KEY_PATH"
+          # Chrome's packer requires unencrypted PKCS#8 even when OpenSSL
+          # accepts the supplied RSA key in another PEM encoding.
+          openssl pkcs8 -topk8 -nocrypt -in "$KEY_PATH" -out "$KEY_PATH.pkcs8"
+          mv "$KEY_PATH.pkcs8" "$KEY_PATH"
           openssl pkey -in "$KEY_PATH" -check -noout
 
           # Verified-upload keys are separate from Google's publication key.
