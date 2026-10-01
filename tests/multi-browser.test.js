@@ -38,7 +38,7 @@ test('one source tree generates isolated Notandia browser packages', () => {
       assert.equal(manifest.version_name, '1.2.3-beta.1');
       assert.equal(manifest.name, '__MSG_extName__');
       assert.equal(manifest.action.default_title, 'Notandia');
-      assert.equal(manifest.homepage_url, 'https://mdpi-filter.pages.dev/');
+      assert.equal(manifest.homepage_url, 'https://notandia.pages.dev/');
       assert.deepEqual(manifest.permissions, ['storage']);
       assert.ok(manifest.content_scripts[0].js.includes('shared/publisher_profiles.js'));
       assert.ok(manifest.content_scripts[0].js.includes('content/reference_counter_normalizer.js'));

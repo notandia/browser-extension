@@ -32,7 +32,7 @@
     "default_popup": "popup.html"
   },
   "options_page": "options.html",
-  "homepage_url": "https://mdpi-filter.pages.dev/",
+  "homepage_url": "https://notandia.pages.dev/",
   "content_scripts": [
     {
       "matches": [
