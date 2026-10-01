@@ -118,7 +118,30 @@
     const primary = Array.from(element.querySelectorAll?.(primarySelector) || []).slice(0, 1);
     const alternate = config?.alternateLinkSelector
       ? Array.from(element.querySelectorAll(config.alternateLinkSelector)) : [];
-    return [...new Set([...primary, ...alternate])].filter(link => searchDestination(link.getAttribute('href'), config));
+    return [...new Set([...primary, ...alternate])].filter(link => searchLinkDestination(link, config));
+  }
+
+  function searchLinkDestination(link, config) {
+    const href = link.getAttribute('href');
+    const destination = searchDestination(href, config);
+    if (destination) return destination;
+    // Google's opaque /goto links cannot be decoded as URLs. Use only the
+    // displayed URL inside the title link, never snippet text or other links.
+    if (!config?.isGoogleWeb) return null;
+    try {
+      const wrapper = new URL(href, document.baseURI);
+      if (!/^https?:$/.test(wrapper.protocol) || wrapper.hostname !== location.hostname || wrapper.pathname !== '/goto') return null;
+      const cites = link.querySelectorAll('cite');
+      if (cites.length !== 1) return null;
+      const displayed = cleanText(cites[0], 1000);
+      const hostname = displayed.match(/^(?:https?:\/\/)?([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)(?=$|[\/\s›»…])/i)?.[1];
+      if (!hostname || hostname.length > 253) return null;
+      const url = new URL(`https://${hostname}/`);
+      if (url.hostname === location.hostname) return null;
+      // Breadcrumbs can be truncated: they establish a domain, not a DOI or
+      // a full article path. Keep identifier extraction out of this fallback.
+      return url.href;
+    } catch { return null; }
   }
 
   function cleanText(element, maxLength = 500) {
@@ -203,7 +226,7 @@
       if (value) values.push(value);
     }
     for (const link of links) {
-      const href = kind === 'search-result' ? searchDestination(link.getAttribute('href'), searchConfig) : link.getAttribute('href') || '';
+      const href = kind === 'search-result' ? searchLinkDestination(link, searchConfig) : link.getAttribute('href') || '';
       if (!href) continue;
       if (kind === 'search-result' && location.hostname === 'scholar.google.com') {
         try {

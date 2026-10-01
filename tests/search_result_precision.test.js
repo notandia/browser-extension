@@ -72,6 +72,39 @@ test('Bing tracking links decode the destination without treating tracking param
   assert.equal(record.doi, null);
 });
 
+test('Google opaque goto results use the title-link URL domain without inventing identifiers', () => {
+  const c = page('https://www.google.com/search?q=10.3390/wrong', `
+    <div class="MjjYud" id="mdpi"><a href="/goto?url=CAESopaque"><h3>Study</h3><cite>https://www.mdpi.com<span> › 10.3389/wrong</span></cite></a><p>PMID: 32205204</p></div>
+    <div class="MjjYud" id="frontiers"><a href="/goto?url=CAESother"><h3>Study</h3><cite>www.frontiersin.org › journals › ...</cite></a></div>
+    <div class="MjjYud" id="neutral"><a href="/goto?url=CAESthird"><h3>MDPI discussion</h3><cite>https://example.org › MDPI</cite></a><p>10.3390/wrong</p><a href="https://www.mdpi.com">Related source</a></div>
+    <div class="MjjYud" id="ai"><div data-aim="1"><a href="/goto?url=CAESai"><h3>AI answer</h3><cite>https://www.mdpi.com</cite></a></div></div>`);
+  const records = c.NotandiaSourceContext.collectRecords().searchResults;
+  assert.deepEqual(Array.from(records, r => r.element.id), ['mdpi', 'frontiers', 'neutral']);
+  assert.equal(matches(c, records[0])[0].profileId, 'mdpi');
+  assert.equal(matches(c, records[1])[0].profileId, 'frontiers');
+  assert.equal(matches(c, records[2]).length, 0);
+  for (const record of records) {
+    assert.equal(record.doi, null);
+    assert.deepEqual(Array.from(record.evidence.pmids), []);
+  }
+  records[0].element.querySelector('cite').textContent = 'https://example.org › changed';
+  assert.equal(matches(c, c.NotandiaSourceContext.collectRecords().searchResults[0]).length, 0);
+});
+
+test('Google displayed URLs cannot override direct links or leak from outside the title link', () => {
+  const c = page('https://www.google.com/search?q=mdpi', `
+    <div class="MjjYud" id="direct"><a href="https://example.org/paper"><h3>Study</h3><cite>https://www.mdpi.com</cite></a></div>
+    <div class="MjjYud"><a href="/goto?url=opaque"><h3>Study</h3></a><cite>https://www.mdpi.com</cite></div>
+    <div class="MjjYud"><a href="/search?q=opaque"><h3>Navigation</h3><cite>https://www.mdpi.com</cite></a></div>
+    <div class="MjjYud"><a href="/goto?url=opaque"><h3>Study</h3><cite>MDPI publisher</cite></a></div>
+    <div class="MjjYud"><a href="/goto?url=opaque"><h3>Study</h3><cite>https://www.mdpi.com@evil.example</cite></a></div>
+    <div class="MjjYud"><a href="/goto?url=opaque"><h3>Study</h3><cite>https://www.mdpi.com</cite><cite>https://example.org</cite></a></div>
+    <div class="MjjYud" id="suffix"><a href="/goto?url=opaque"><h3>Study</h3><cite>https://mdpi.com.evil.example › paper</cite></a></div>`);
+  const records = c.NotandiaSourceContext.collectRecords().searchResults;
+  assert.deepEqual(Array.from(records, r => r.element.id), ['direct', 'suffix']);
+  for (const record of records) assert.equal(matches(c, record).length, 0);
+});
+
 test('PubMed preserves structured DOI evidence and resolves relative article links', () => {
   const c = page('https://pubmed.ncbi.nlm.nih.gov/?term=mdpi', '<article class="full-docsum"><a class="docsum-title" href="/36417205/">Study</a><span class="docsum-journal-citation">doi: 10.3390/epidemiologia1010001.</span><p>Also discusses PMID: 32205204</p></article>');
   const [record] = c.NotandiaSourceContext.collectRecords().searchResults;
