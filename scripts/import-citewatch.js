@@ -15,8 +15,20 @@ function splitParameters(value) {
   }
   parts.push(value.slice(start).trim()); return parts;
 }
+function omitRegions(text, opening, closing) {
+  const parts = []; let cursor = 0;
+  while (cursor < text.length) {
+    const start = text.toLowerCase().indexOf(opening, cursor);
+    if (start < 0) { parts.push(text.slice(cursor)); break; }
+    parts.push(text.slice(cursor, start), ' ');
+    const end = text.toLowerCase().indexOf(closing, start + opening.length);
+    if (end < 0) break;
+    cursor = end + closing.length;
+  }
+  return parts.join('');
+}
 function templates(text, name) {
-  text = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<nowiki>[\s\S]*?<\/nowiki>/gi, '');
+  text = omitRegions(omitRegions(text, '<!--', '-->'), '<nowiki>', '</nowiki>');
   const entries = []; const pattern = new RegExp(`\\{\\{${name}\\s*\\|`, 'gi'); let match;
   while ((match = pattern.exec(text))) {
     let depth = 1, i = pattern.lastIndex;

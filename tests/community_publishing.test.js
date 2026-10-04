@@ -170,6 +170,7 @@ test('CiteWatch offline parser preserves notes and rejects malformed prefixes', 
   assert.equal(records[0].note, '[[Other Journal|Other]] is a namesake.');
   assert.throws(() => extractRecords('{{JCW-selected|Example|doi=javascript:alert(1)}}', 'journal'), /Unsupported/);
   assert.throws(() => extractRecords('{{JCW-selected|Example', 'journal'), /Unclosed/);
+  assert.equal(extractRecords('<!--{{JCW-selected|Inactive Journal}}--><nowiki>{{JCW-selected|Example syntax}}</nowiki>{{JCW-selected|Active Journal}}', 'journal').length, 1);
 });
 
 test('additional CiteWatch prefixes inherit existing named publisher controls', () => {

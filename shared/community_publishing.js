@@ -54,11 +54,12 @@
   const citewatchRules = new Map();
   const byPrefix = new Map();
   const byName = new Map();
+  // Text only: callers display these strings through textContent, never HTML.
   function plain(value) {
     return String(value || '').replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, '$2')
       .replace(/\[\[([^\]]+)\]\]/g, '$1').replace(/\[(https?:\/\/[^\s\]]+)\s+([^\]]+)\]/g, '$2')
       .replace(/\[(https?:\/\/[^\]]+)\]/g, '$1').replace(/'{2,}/g, '')
-      .replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+      .replace(/&nbsp;/g, ' ').trim();
   }
   function nameKey(value) { return plain(value).normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim(); }
   const exclusionMap = new Map();
