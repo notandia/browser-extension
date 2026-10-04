@@ -160,7 +160,7 @@ button.text-button { background: transparent; color: #2b5c88; padding: 3px 4px; 
   box-shadow: inset 0 0 0 1px var(--signal-color);
 }
 .signal-card span { color: var(--ink); font-size: 13px; font-weight: 700; }
-.signal-card strong { color: var(--signal-color); font-size: 13px; line-height: 1; font-variant-numeric: tabular-nums; }
+.signal-card strong { color: var(--signal-ink, var(--signal-color)); font-size: 13px; line-height: 1; font-variant-numeric: tabular-nums; }
 .all-context-card { --signal-color: #48627a; --signal-tint: #eef3f7; }
 .publisher-signal-card { --signal-color: #48627a; }
 .status-retracted { --signal-color: #b42318; --signal-tint: #fff4f2; }
@@ -195,8 +195,8 @@ button.text-button { background: transparent; color: #2b5c88; padding: 3px 4px; 
 .context-card strong { display: block; font-size: 13px; }
 .context-card code { display: block; margin-top: 2px; color: #2d4d6a; font-size: 12px; overflow-wrap: anywhere; }
 .chip-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
-.chip { display: inline-flex; align-items: center; border: 1px solid var(--chip-color, #48627a); color: var(--chip-color, #48627a); background: var(--chip-tint, #fff); border-radius: 999px; padding: 2px 7px; font-weight: 700; font-size: 13px; }
-.chip.integrity { border-color: var(--chip-color, #b42318); color: var(--chip-color, #b42318); }
+.chip { display: inline-flex; align-items: center; border: 1px solid var(--chip-color, #48627a); color: var(--chip-ink, var(--chip-color, #48627a)); background: #fff; border-radius: 999px; padding: 2px 7px; font-weight: 700; font-size: 13px; }
+.chip.integrity { border-color: var(--chip-color, #b42318); color: var(--chip-ink, var(--chip-color, #b42318)); }
 .chip.integrity.primary-integrity { border-width: 2px; padding: 1px 6px; }
 
 .results-heading-row { flex-direction: column; align-items: stretch; }
@@ -290,6 +290,24 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .pin-tip summary { cursor: pointer; font-size: 14px; font-weight: 700; }
 .pin-tip { padding: 8px 12px; }
 .pin-tip summary { display: flex; align-items: center; }
+.lookup-setup { margin-bottom: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.lookup-setup h2 { margin: 0; font-size: 17px; line-height: 1.3; }
+.lookup-setup p { margin: 7px 0; font-size: 13px; }
+.lookup-setup .lookup-intro { color: var(--muted); margin-bottom: 14px; }
+.lookup-benefits { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.lookup-benefits li { display: flex; align-items: flex-start; gap: 9px; }
+.lookup-benefit-mark { display: grid; place-items: center; flex: 0 0 24px; height: 24px; border-radius: 7px; color: var(--ink); background: #edf3f8; font-weight: 800; }
+.lookup-benefits strong { display: block; font-size: 13px; }
+.lookup-benefits small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.lookup-setup .lookup-disclosure { color: var(--muted); font-size: 12px; margin: 14px 0 12px; }
+.lookup-actions { display: grid; gap: 7px; }
+#enableRecommendedChecks { width: 100%; min-height: 42px; }
+.lookup-secondary-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.lookup-secondary-actions button { flex: 1 1 160px; min-height: 36px; font-size: 12px; border: 1px solid var(--line); }
+.lookup-data-details { margin-top: 7px; font-size: 12px; color: var(--muted); }
+.lookup-data-details summary { cursor: pointer; display: list-item; line-height: 36px; }
+.lookup-data-details p { font-size: 12px; }
+#lookupSetupStatus:empty { display: none; }
 
 /* Settings is a separate view, not another long panel above the results. */
 .container.settings-open > .section,
@@ -300,3 +318,16 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .quick-profile select { min-height: 40px; }
 
 .settings-glyph { font-family: "Arial", sans-serif; font-size: 26px; line-height: 1; flex: 0 0 auto; }
+/* Publisher controls remain visible without relying on the colour swatch. */
+.quick-profile select,.quick-profile input[type="color"]{border:1px solid #48627a;background:#fff;color:var(--ink)}
+.publisher-signal-card strong{background:#fff;border-radius:3px}
+
+.publisher-evidence { margin-top: 10px; font-size: 12px; line-height: 1.5; }
+.publisher-evidence summary { cursor: pointer; color: var(--ink); }
+.publisher-evidence summary { overflow-wrap: anywhere; }
+.publisher-signal-card { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.context-list .publisher-evidence p { display: block; overflow: visible; -webkit-line-clamp: unset; max-height: none; }
+.publisher-evidence a { display: block; margin-top: 6px; overflow-wrap: anywhere; color: #145b9e; }
+.publisher-warning-sources a { color: #145b9e; overflow-wrap: anywhere; }
+.publisher-warning-sources a:focus-visible { outline: 3px solid #175cd3; outline-offset: 2px; }
+.publisher-evidence summary:focus-visible, .publisher-evidence a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }

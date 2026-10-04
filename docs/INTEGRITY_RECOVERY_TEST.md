@@ -43,14 +43,21 @@ For an affected reference such as reference 144, verify:
 
 ## MDPI bibliography page
 
+Open `https://www.mdpi.com/2073-445X/15/8/1343`. With the MDPI profile enabled, its 50-reference bibliography should produce **3 MDPI references** in the popup: references **25, 26, and 50**. The current article is excluded from that reference count.
+
 On an MDPI article whose bibliography items use `data-content="25."` or similar, verify:
 
 - the popup uses the visible bibliography number, not the trailing digits of the DOM ID;
 - the MDPI badge is fully contained inside the highlighted reference entry;
-- the built-in MDPI profile remains its historical bright red (`#E2211C`) unless changed by the user;
+- fresh installations use MDPI amber (`#B45309`) and Frontiers violet (`#7C3AED`); existing saved colors, including historical MDPI red, remain unchanged;
 - the bright-red labeled publisher badge is not presented as a formal retraction; formal retractions use their own darker status red (`#B42318`) and explicit Retracted wording.
 
 ## Recovery
+
+During a publisher scan, an empty report must show a waiting state rather than a final zero. Opening the popup with a missing or empty publisher report attempts one rescan. If the content script cannot be reached, the popup offers **Refresh this page**, explaining that open tabs may need a refresh after installation or an update.
+
+With NCBI enabled and its response delayed, direct DOI/domain publisher matches must appear before metadata finishes; resolved metadata can then add further matches.
+
 
 After a completed scan:
 

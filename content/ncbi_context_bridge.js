@@ -175,11 +175,11 @@
     return new Promise(resolve => {
       chrome.storage.sync.get({
         publisherWatchlist: null,
-        mode: 'highlight',
-        highlightPotentialMdpiSites: true,
-        potentialMdpiHighlightColor: '#E2211C',
+        mode: null,
+        highlightPotentialMdpiSites: null,
+        potentialMdpiHighlightColor: null,
         integrityLookupsEnabled: false,
-        ncbiApiEnabled: true
+        ncbiApiEnabled: false
       }, stored => resolve(chrome.runtime.lastError ? null : stored));
     });
   }

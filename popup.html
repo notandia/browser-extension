@@ -16,6 +16,30 @@
       <button id="settingsIcon" class="icon-button" type="button" aria-label="Open quick settings" aria-expanded="false"><span class="settings-glyph" aria-hidden="true">⚙</span><span class="settings-label">Settings</span></button>
     </header>
 
+    <aside id="lookupSetup" class="lookup-setup" aria-labelledby="lookupSetupHeading" hidden>
+      <h2 id="lookupSetupHeading">Improve your research checks</h2>
+      <p class="lookup-intro">Add useful context to the papers and references you read.</p>
+      <ul class="lookup-benefits">
+        <li><span class="lookup-benefit-mark" aria-hidden="true">✓</span><span><strong>Notice important updates</strong><small>Crossref checks for retractions, corrections and expressions of concern.</small></span></li>
+        <li><span class="lookup-benefit-mark" aria-hidden="true">✓</span><span><strong>Identify more publisher matches</strong><small>NCBI fills gaps in PubMed and PMC metadata.</small></span></li>
+      </ul>
+      <p class="lookup-disclosure">Automatic checks share scholarly identifiers and your IP address with Crossref and NCBI. Turn off anytime.</p>
+      <div class="lookup-actions">
+        <button id="enableRecommendedChecks" type="button">Enable recommended checks</button>
+        <div class="lookup-secondary-actions">
+          <button id="keepLookupSettings" class="text-button" type="button">Keep current settings</button>
+          <button id="chooseLookupChecks" class="text-button" type="button">Choose individually</button>
+        </div>
+      </div>
+      <details class="lookup-data-details">
+        <summary>Data details and current settings</summary>
+        <p id="lookupCurrentSettings"></p>
+        <p>Crossref receives DOIs. NCBI receives DOI, PMID or PMCID identifiers. Page text, search queries and page addresses are not sent.</p>
+        <p>Checks run automatically when a page exposes article or reference identifiers. Enable or disable either service in Quick settings, then select Save quick settings.</p>
+      </details>
+      <p id="lookupSetupStatus" role="status" aria-live="polite"></p>
+    </aside>
+
     <aside id="pinTip" class="pin-tip" aria-label="Toolbar shortcut" hidden>
       <details><summary>Pin Notandia for quick access</summary>
       <p>Pin Notandia to your toolbar to open reference checks in one click.</p>
@@ -26,8 +50,11 @@
     <section id="settingsPanel" class="settings-panel" aria-label="Quick settings">
       <div class="settings-heading"><strong>Publisher watchlist</strong><button id="managePublishers" type="button" class="text-button">Manage publishers</button></div>
       <div id="quickProfiles" class="quick-profiles"></div>
+      <label class="checkbox-label" for="communityWarningsEnabledPopup"><input type="checkbox" id="communityWarningsEnabledPopup" aria-labelledby="additionalWarningsLabelPopup" aria-describedby="additionalWarningsSourcesPopup"><span><span id="additionalWarningsLabelPopup">Additional publisher and journal warnings</span><small id="additionalWarningsSourcesPopup" class="publisher-warning-sources">Wikimedia’s Cite Unseen: <a href="https://meta.wikimedia.org/w/index.php?title=Cite_Unseen/sources/predatory/publishers&amp;oldid=30328516" target="_blank" rel="noopener noreferrer">publisher list</a> · <a href="https://meta.wikimedia.org/w/index.php?title=Cite_Unseen/sources/predatory/standaloneJournals&amp;oldid=30328518" target="_blank" rel="noopener noreferrer">journal list</a> (30 March 2026). Wikipedia CiteWatch: <a href="https://en.wikipedia.org/w/index.php?title=User:JL-Bot/Questionable.cfg/Publishers&amp;oldid=1369144524" target="_blank" rel="noopener noreferrer">publishers</a> · <a href="https://en.wikipedia.org/w/index.php?title=User:JL-Bot/Questionable.cfg/Journals&amp;oldid=1353634792" target="_blank" rel="noopener noreferrer">journals</a>. OMICS and iMedPub: <a href="https://search.ftc.gov/legal-library/browse/cases-proceedings/152-3113-omics-group-inc" target="_blank" rel="noopener noreferrer">FTC judgment (2019)</a>.</small></span></label>
       <label class="checkbox-label" for="integrityLookupsEnabled"><input type="checkbox" id="integrityLookupsEnabled"><span>Check DOIs with Crossref<small>Only DOI identifiers are transmitted.</small></span></label>
       <label class="checkbox-label" for="ncbiApiEnabledPopup"><input type="checkbox" id="ncbiApiEnabledPopup"><span>Use NCBI metadata<small>Improves publisher detection from PubMed and PMC identifiers.</small></span></label>
+
+
       <label class="checkbox-label" for="loggingEnabled"><input type="checkbox" id="loggingEnabled"><span>Diagnostic logging</span></label>
       <button id="save" type="button">Save quick settings</button>
       <div id="status" role="status" aria-live="polite"></div>
@@ -47,6 +74,7 @@
         <span class="scan-spinner" aria-hidden="true"></span>
         <span id="contextScanText">Scanning publisher profiles and citation links…</span>
       </div>
+      <button id="refreshContextPage" type="button" hidden>Refresh this page</button>
 
       <div class="filter-toolbar" aria-label="Filter references by context">
         <span class="filter-label">Filter</span>
@@ -103,9 +131,12 @@
       </div>
     </details>
   </main>
+  <script src="shared/community_publishing_data.js"></script>
+  <script src="shared/community_publishing.js"></script>
   <script src="shared/publisher_profiles.js"></script>
   <script src="popup_pin_tip.js"></script>
   <script src="popup.js"></script>
+  <script src="popup_lookup_setup.js"></script>
   <script src="popup_overview.js"></script>
   <script src="popup_progress.js"></script>
   <script src="popup_recovery.js"></script>

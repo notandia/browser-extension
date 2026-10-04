@@ -6,16 +6,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const $ = id => document.getElementById(id);
   const el = {
     settings: $('settingsIcon'), panel: $('settingsPanel'), quickProfiles: $('quickProfiles'), save: $('save'), status: $('status'),
-    integrity: $('integrityLookupsEnabled'), ncbi: $('ncbiApiEnabledPopup'), logging: $('loggingEnabled'), manage: $('managePublishers'),
+    integrity: $('integrityLookupsEnabled'), ncbi: $('ncbiApiEnabledPopup'), logging: $('loggingEnabled'), community: $('communityWarningsEnabledPopup'), manage: $('managePublishers'),
     articleSection: $('articleContextSection'), article: $('articleContext'), articleSummary: $('articleContextSummary'), integrityCoverage: $('integrityCoverage'),
     contextList: $('contextList'), referencesSummary: $('referencesSummary'), contextFilter: $('contextFilter'), contextSort: $('contextSort'),
     rescan: $('rescan'), report: $('reportIssue'), reportCategory: $('reportCategory')
   };
   const countIds = { retracted: 'countRetracted', 'expression-of-concern': 'countConcern', corrected: 'countCorrected', withdrawn: 'countWithdrawn' };
   let watchlist = api.defaultSettings();
+  let evidenceProfiles = api.profileMap(watchlist);
   let publisherReport = null;
   let integrityReport = null;
   let integrityStatuses = {};
+  let publisherScanning = true;
   let restoreInFlight = false;
   let reloadQueued = false;
 
@@ -87,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
     node.textContent = label;
     if (color) {
       node.style.setProperty('--chip-color', color);
-      node.style.setProperty('--chip-tint', rgba(color, 0.055));
+      node.style.setProperty('--chip-ink', api.readableColor(color));
     }
     return node;
   }
@@ -122,7 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ['status:withdrawn', 'Withdrawn'],
       ['publisher:any', 'Publisher matches']
     ];
-    for (const profile of watchlist.profiles.filter(profile => profile.enabled)) {
+    const matchedProfiles = new Set([...(publisherReport?.references || []), ...(publisherReport?.searchResults || [])].flatMap(record => (record.matches || []).map(match => match.profileId)));
+    for (const profile of api.effectiveProfiles(watchlist).filter(profile => profile.enabled && (profile.source !== 'community' || matchedProfiles.has(profile.id)))) {
       options.push([`profile:${profile.id}`, profile.name]);
     }
     el.contextFilter.replaceChildren();
@@ -137,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderQuickProfiles() {
     el.quickProfiles.replaceChildren();
+    el.community.checked = watchlist.communityWarningsEnabled;
     for (const profile of watchlist.profiles) {
       const row = document.createElement('div');
       row.className = 'quick-profile';
@@ -151,6 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
       label.append(enabled, name);
       const action = document.createElement('select');
       action.className = 'quick-action';
+      action.setAttribute('aria-label', `${profile.name} action`);
       for (const value of api.ACTIONS) {
         const option = document.createElement('option');
         option.value = value;
@@ -163,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
       color.className = 'quick-color';
       color.value = profile.color;
       color.title = `${profile.name} color`;
+      color.setAttribute('aria-label', `${profile.name} color`);
       row.append(label, action, color);
       el.quickProfiles.appendChild(row);
     }
@@ -178,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
       profile.action = row.querySelector('.quick-action').value;
       profile.color = row.querySelector('.quick-color').value;
     }
-    watchlist = api.sanitizeSettings({ ...watchlist, profiles: Array.from(byId.values()) });
+    watchlist = api.sanitizeSettings({ ...watchlist, profiles: Array.from(byId.values()), communityWarningsEnabled: el.community.checked });
     refreshContextFilterOptions();
   }
 
@@ -190,6 +196,36 @@ document.addEventListener('DOMContentLoaded', () => {
       const extraClass = event.status === primaryStatus ? 'integrity primary-integrity' : 'integrity';
       container.appendChild(chip(label, color, extraClass));
     }
+  }
+
+  function appendPublisherEvidence(container, matches) {
+    for (const match of matches || []) {
+      const profile = evidenceProfiles.get(match.profileId);
+      if (!profile || !['builtin', 'preset', 'community'].includes(profile.source)) continue;
+      const context = api.matchContext(profile, match);
+      if (!context) continue;
+      const details = document.createElement('details');
+      details.className = 'publisher-evidence';
+      const summary = document.createElement('summary');
+      summary.textContent = match.publicationType ? `About this ${api.publicationTypeLabel(match.publicationType).toLowerCase()}` : profile.source === 'community' ? `Why ${profile.name} is listed` : `Why ${profile.name} is on the watchlist`;
+      const explanation = document.createElement('p');
+      explanation.textContent = `${context.assessment}. ${context.explanation} ${context.evidence} Reviewed ${context.reviewed}.`;
+      details.append(summary, explanation);
+      for (const source of context.sources) {
+        const link = document.createElement('a');
+        link.href = source.url;
+        link.textContent = source.label;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        details.appendChild(link);
+      }
+      container.appendChild(details);
+    }
+  }
+
+  function appendPublicationTypeChips(container, matches) {
+    const labels = new Set((matches || []).map(match => api.publicationTypeLabel(match.publicationType)).filter(Boolean));
+    for (const label of labels) container.appendChild(chip(label, '#48627A'));
   }
 
   function renderArticleContext() {
@@ -210,10 +246,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const chips = document.createElement('div');
     chips.className = 'chip-row';
     for (const match of matches) chips.appendChild(chip(match.profileName, match.color));
+    appendPublicationTypeChips(chips, matches);
     appendIntegrityChips(chips, currentIntegrity?.events || [], currentIntegrity?.primaryStatus);
     el.article.append(title);
     if (doi.textContent) el.article.append(doi);
     el.article.append(chips);
+    appendPublisherEvidence(el.article, matches);
 
     const parts = [];
     if (matches.length) parts.push(`${matches.length} publisher match${matches.length === 1 ? '' : 'es'}`);
@@ -319,9 +357,12 @@ document.addEventListener('DOMContentLoaded', () => {
       placeholder.className = 'placeholder';
       placeholder.textContent = allRecords.length
         ? 'No references match this filter.'
-        : 'No publisher matches or known formal updates were found.';
+        : !publisherReport || publisherScanning
+          ? 'Reference checks are still running. Refresh the page if checks do not finish.'
+          : 'No publisher matches or known formal updates were found.';
       el.contextList.appendChild(placeholder);
-      el.referencesSummary.textContent = allRecords.length ? `0 of ${allRecords.length} references shown` : 'Nothing to review';
+      el.referencesSummary.textContent = allRecords.length ? `0 of ${allRecords.length} references shown`
+        : !publisherReport || publisherScanning ? 'Waiting for reference checks…' : 'Nothing to review';
       return;
     }
 
@@ -360,8 +401,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const chips = document.createElement('div');
       chips.className = 'chip-row';
       for (const match of record.matches || []) chips.appendChild(chip(match.profileName, match.color));
+      appendPublicationTypeChips(chips, record.matches);
       appendIntegrityChips(chips, record.events || [], record.primaryStatus);
       if (chips.childElementCount) item.appendChild(chips);
+      appendPublisherEvidence(item, record.matches);
       el.contextList.appendChild(item);
     }
 
@@ -371,12 +414,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderAll() {
+    evidenceProfiles = api.profileMap(watchlist);
     renderArticleContext();
     setIntegrityCounts();
     renderContextList();
   }
 
   function fetchReports() {
+    chrome.runtime.sendMessage({ type: 'getContextScanState' }, response => {
+      if (!chrome.runtime.lastError) {
+        publisherScanning = response?.publisherScanning === true;
+        renderAll();
+      }
+    });
     chrome.runtime.sendMessage({ type: 'getPublisherContext' }, response => {
       if (!chrome.runtime.lastError) {
         publisherReport = response?.report || null;
@@ -436,12 +486,14 @@ document.addEventListener('DOMContentLoaded', () => {
   el.contextSort.addEventListener('change', renderContextList);
 
   el.contextList.addEventListener('click', event => {
+    if (event.target.closest('a, button, input, select, textarea, summary')) return;
     const item = event.target.closest('li[data-ref-id]');
     if (!item) return;
     chrome.runtime.sendMessage({ type: 'scrollToRef', refId: item.dataset.refId }, () => void chrome.runtime.lastError);
   });
   el.contextList.addEventListener('keydown', event => {
     if (!['Enter', ' '].includes(event.key)) return;
+    if (event.target.closest('a, button, input, select, textarea, summary')) return;
     const item = event.target.closest('li[data-ref-id]');
     if (!item) return;
     event.preventDefault();
@@ -451,9 +503,10 @@ document.addEventListener('DOMContentLoaded', () => {
   el.save.addEventListener('click', () => {
     void (async () => {
       readQuickProfiles();
-      const consent = await setFirefoxDataConsent(el.integrity.checked).catch(() => false);
-      if (el.integrity.checked && !consent) {
+      const consent = await setFirefoxDataConsent(el.integrity.checked || el.ncbi.checked).catch(() => false);
+      if ((el.integrity.checked || el.ncbi.checked) && !consent) {
         el.integrity.checked = false;
+        el.ncbi.checked = false;
         return setStatus('Firefox data permission was not granted.');
       }
       const mdpi = watchlist.profiles.find(profile => profile.id === 'mdpi');
@@ -464,9 +517,10 @@ document.addEventListener('DOMContentLoaded', () => {
         loggingEnabled: el.logging.checked,
         mode: mdpi?.action === 'hide' ? 'hide' : 'highlight',
         highlightPotentialMdpiSites: mdpi?.confidencePolicy === 'confirmed-and-potential',
-        potentialMdpiHighlightColor: mdpi?.color || '#E2211C'
+        potentialMdpiHighlightColor: mdpi?.color || api.BUILTIN_PROFILES[0].color
       }, () => {
         if (chrome.runtime.lastError) return setStatus('Could not save settings.');
+        chrome.storage.local?.set({ notandiaLookupSetupDismissed: true }, () => void chrome.runtime.lastError);
         setStatus('Settings saved.');
         forceRescan();
       });
@@ -480,7 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!/^https?:$/.test(parsed.protocol)) throw new Error();
         const address = `${parsed.origin}${parsed.pathname}`;
         const manifest = chrome.runtime.getManifest();
-        const enabledProfiles = watchlist.profiles.filter(profile => profile.enabled).map(profile => profile.id).join(', ') || 'none';
+        const enabledProfiles = api.effectiveProfiles(watchlist).filter(profile => profile.enabled).map(profile => profile.id).join(', ') || 'none';
         const category = el.reportCategory.value;
         const title = encodeURIComponent(`[${category}] Context issue on ${parsed.hostname}`);
         const body = encodeURIComponent(`**Notandia article/context report**\n\n**Category:** ${category}\n\n**Page address (query and fragment omitted):**\n${address}\n\n**What happened?**\n[Describe the incorrect or missing context. Add a DOI or citation only when useful and safe to share.]\n\n---\n- Extension version: ${manifest.version}\n- Enabled publisher profiles: ${enabledProfiles}\n- Integrity checks: ${el.integrity.checked ? 'enabled' : 'disabled'}\n- Browser: ${navigator.userAgent}`);
@@ -492,26 +546,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   chrome.runtime.onMessage.addListener(message => {
-    if (message?.type === 'integrityReportUpdated' || message?.type === 'publisherContextUpdated') loadReports();
+    if (['integrityReportUpdated', 'publisherContextUpdated', 'publisherScanStateUpdated'].includes(message?.type)) loadReports();
   });
 
   chrome.storage.sync.get({
     publisherWatchlist: null,
-    mode: 'highlight',
-    highlightPotentialMdpiSites: true,
-    potentialMdpiHighlightColor: '#E2211C',
+    mode: null,
+    highlightPotentialMdpiSites: null,
+    potentialMdpiHighlightColor: null,
     integrityLookupsEnabled: false,
-    ncbiApiEnabled: true,
+    ncbiApiEnabled: false,
     loggingEnabled: false
   }, stored => {
     watchlist = api.migrateLegacySettings(stored);
     renderQuickProfiles();
-    el.ncbi.checked = stored.ncbiApiEnabled !== false;
+    el.ncbi.checked = stored.ncbiApiEnabled === true;
     el.logging.checked = stored.loggingEnabled === true;
     void hasFirefoxDataConsent().then(permitted => {
       el.integrity.checked = stored.integrityLookupsEnabled === true && permitted;
+      el.ncbi.checked = stored.ncbiApiEnabled === true && permitted;
       renderAll();
-    }).catch(() => { el.integrity.checked = false; });
+    }).catch(() => { el.integrity.checked = false; el.ncbi.checked = false; });
     if (!stored.publisherWatchlist || stored.publisherWatchlist.schemaVersion !== api.SCHEMA_VERSION) chrome.storage.sync.set({ publisherWatchlist: watchlist });
     loadReports();
     setTimeout(loadReports, 500);

@@ -14,7 +14,7 @@ function page(url, html) {
   c.window = c;
   vm.createContext(c);
   c.load = file => vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), c);
-  for (const file of ['shared/work_identifiers.js', 'shared/publisher_profiles.js', 'content/domains.js',
+  for (const file of ['shared/work_identifiers.js', 'shared/community_publishing_data.js', 'shared/community_publishing.js', 'shared/publisher_profiles.js', 'content/domains.js',
     'content/reference_selectors.js', 'content/item_content_checker.js', 'content/source_context.js']) c.load(file);
   return c;
 }

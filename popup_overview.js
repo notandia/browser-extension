@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     filter: $('contextFilter'),
     referencesHeading: $('referencesHeading')
   };
+  const refreshPage = $('refreshContextPage');
   if (!el.publisherGrid || !el.integrityGrid || !el.filter) return;
 
   let settings = api.defaultSettings();
@@ -24,6 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let scanState = { publisherScanning: true, integrityScanning: false };
   let loadPending = false;
   let loadQueued = false;
+  let connectionChecked = false;
+  let pageUnavailable = false;
 
   function runtimeSend(message, callback) {
     try {
@@ -94,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     button.title = `Show ${label} references`;
     if (color) {
       button.style.setProperty('--signal-color', color);
+      button.style.setProperty('--signal-ink', api.readableColor(color));
       button.style.setProperty('--signal-tint', rgba(color, 0.07));
     }
 
@@ -107,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderPublisherCards() {
     const counts = profileCounts();
-    const profiles = (settings.profiles || []).filter(profile => profile.enabled && (counts.get(profile.id) || 0) > 0);
+    const profiles = api.effectiveProfiles(settings).filter(profile => profile.enabled && (counts.get(profile.id) || 0) > 0);
     el.publisherGrid.replaceChildren();
 
     for (const profile of profiles) {
@@ -122,7 +126,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderSummary() {
     const counts = allContextCounts();
-    if (el.allCount) el.allCount.textContent = String(counts.total);
+    const waiting = !publisherReport || (!counts.total && scanState.publisherScanning === true);
+    if (el.allCount) el.allCount.textContent = waiting ? '—' : String(counts.total);
+    if (refreshPage) refreshPage.hidden = !pageUnavailable;
+    if (pageUnavailable) {
+      if (el.heading) el.heading.textContent = 'Refresh this page to start checks';
+      if (el.summary) el.summary.textContent = 'Notandia could not connect to this page. Open tabs may need a refresh after installation or an update.';
+      return;
+    }
+    if (!publisherReport) {
+      if (el.heading) el.heading.textContent = 'Waiting for reference checks…';
+      if (el.summary) el.summary.textContent = 'Connecting to the page scanner…';
+      return;
+    }
 
     const stillScanning = scanState.publisherScanning === true || integrityReport?.state === 'loading' || scanState.integrityScanning === true;
     if (el.heading) {
@@ -133,7 +149,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!el.summary) return;
     const parts = [];
-    if (counts.publishers) parts.push(`${counts.publishers} publisher match${counts.publishers === 1 ? '' : 'es'}`);
+    const scanned = publisherReport?.coverage?.referencesScanned;
+    if (Number.isInteger(scanned)) parts.push(`${publisherReport.references.length} of ${scanned} scanned references match your watchlist`);
+    if (counts.publishers && (!Number.isInteger(scanned) || publisherReport.searchResults?.length)) parts.push(`${counts.publishers} publisher match${counts.publishers === 1 ? '' : 'es'}`);
     if (counts.formal) parts.push(`${counts.formal} work${counts.formal === 1 ? '' : 's'} with formal updates`);
     el.summary.textContent = parts.length
       ? parts.join(' · ')
@@ -149,6 +167,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderScanState() {
     if (!el.scanState || !el.scanText) return;
+    if (pageUnavailable) {
+      el.scanState.hidden = true;
+      return;
+    }
     const publisherScanning = scanState.publisherScanning === true || !publisherReport;
     const integrityScanning = integrityReport?.state === 'loading' || scanState.integrityScanning === true;
 
@@ -203,6 +225,35 @@ document.addEventListener('DOMContentLoaded', () => {
     syncActiveCards();
   }
 
+  function recoverMissingPublisherScan() {
+    if (allContextCounts().publishers || connectionChecked) return;
+    connectionChecked = true;
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+      const tab = tabs?.[0];
+      if (!Number.isInteger(tab?.id) || !/^https?:\/\//i.test(tab.url || '')) return;
+      chrome.tabs.sendMessage(tab.id, { type: 'forcePublisherRescan' }, response => {
+        pageUnavailable = Boolean(chrome.runtime.lastError) || response?.scheduled !== true;
+        render();
+        if (!pageUnavailable) setTimeout(load, 500);
+      });
+    });
+  }
+
+  refreshPage?.addEventListener('click', () => {
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+      const tabId = tabs?.[0]?.id;
+      if (!Number.isInteger(tabId)) return;
+      chrome.tabs.reload(tabId, () => {
+        if (chrome.runtime.lastError) return;
+        pageUnavailable = false;
+        connectionChecked = false;
+        publisherReport = null;
+        render();
+        setTimeout(load, 1000);
+      });
+    });
+  });
+
   function load() {
     if (loadPending) {
       loadQueued = true;
@@ -215,6 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (remaining > 0) return;
       loadPending = false;
       render();
+      recoverMissingPublisherScan();
       if (loadQueued) {
         loadQueued = false;
         setTimeout(load, 25);
@@ -223,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     runtimeSend({ type: 'getPublisherContext' }, response => {
       publisherReport = response?.report || null;
+      if (publisherReport) pageUnavailable = false;
       settings = response?.settings || settings;
       done();
     });

@@ -107,8 +107,8 @@
     };
   }
 
-  function ncbiLookupEnabled() {
-    return new Promise(resolve => {
+  async function ncbiLookupEnabled() {
+    const enabled = await new Promise(resolve => {
       if (!chrome.storage?.sync) {
         resolve(false);
         return;
@@ -117,6 +117,15 @@
         resolve(!chrome.runtime.lastError && stored?.ncbiApiEnabled === true);
       });
     });
+    if (!enabled) return false;
+    const optional = chrome.runtime.getManifest?.().browser_specific_settings?.gecko?.data_collection_permissions?.optional;
+    if (!Array.isArray(optional) || !optional.includes('websiteContent')) return true;
+    try {
+      const permissions = await globalThis.browser?.permissions?.getAll();
+      return Array.isArray(permissions?.data_collection) && permissions.data_collection.includes('websiteContent');
+    } catch {
+      return false;
+    }
   }
 
   async function performNcbiFetch(ids, idType) {
@@ -178,6 +187,9 @@
       if (Date.now() < ncbiBlockedUntil) return ncbiCooldownResult();
       const wait = Math.max(0, ncbiNextRequestAt - Date.now());
       if (wait) await delay(wait);
+      // A queued batch must respect disablement or permission withdrawal
+      // that occurred while an earlier request was running.
+      if (!(await ncbiLookupEnabled())) return { status: 'disabled', records: [], retryAfterMs: 0 };
       if (Date.now() < ncbiBlockedUntil) return ncbiCooldownResult();
       ncbiNextRequestAt = Date.now() + NCBI_MIN_REQUEST_INTERVAL_MS;
       return performNcbiFetch(ids, idType);

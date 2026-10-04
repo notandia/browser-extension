@@ -16,6 +16,7 @@
   const originalStyles = new WeakMap();
   const managedElements = new Set();
   const managedInlineAnchors = new Set();
+  const originalInlineDescriptions = new WeakMap();
 
   let settings = api.defaultSettings();
   let ncbiEnabled = false;
@@ -25,8 +26,12 @@
 
   function profileEvidence(record) {
     return {
+      primaryDoi: record?.doi,
       dois: Array.from(record?.evidence?.dois || []),
       hostnames: Array.from(record?.evidence?.hostnames || []),
+      urls: Array.from(record?.evidence?.urls || []),
+      journalNames: Array.from(record?.evidence?.journalNames || []),
+      publisherNames: Array.from(record?.evidence?.publisherNames || []),
       // Resolved DOI evidence takes priority over journal-name heuristics.
       profileSignals: record?.doi ? [] : Array.from(record?.evidence?.profileSignals || [])
     };
@@ -88,8 +93,9 @@
     for (const match of visible) {
       const badge = document.createElement('span');
       badge.className = 'notandia-publisher-badge';
-      badge.textContent = match.profileName;
+      badge.textContent = [match.profileName, api.publicationTypeLabel(match.publicationType)].filter(Boolean).join(' · ');
       badge.style.setProperty('--notandia-profile-color', match.color);
+      badge.style.setProperty('--notandia-profile-ink', api.readableColor(match.color));
       badge.title = `${match.profileName}: ${match.confidence} match (${match.reasons.join(', ')})`;
       container.appendChild(badge);
     }
@@ -98,7 +104,7 @@
 
   function styleSignature(matches) {
     return matches
-      .map(match => [match.profileId, match.confidence, match.action, match.color, ...(match.reasons || [])].join(':'))
+      .map(match => [match.profileId, match.confidence, match.action, match.color, match.publicationType || '', ...(match.reasons || [])].join(':'))
       .sort()
       .join('|');
   }
@@ -142,7 +148,13 @@
     anchor.classList.remove('notandia-publisher-citation');
     anchor.removeAttribute(INLINE_ACTION_ATTRIBUTE);
     anchor.removeAttribute(INLINE_PROFILE_ATTRIBUTE);
+    anchor.removeAttribute('data-notandia-publisher-name');
+    const description = originalInlineDescriptions.get(anchor);
+    if (description != null) anchor.setAttribute('aria-description', description);
+    else anchor.removeAttribute('aria-description');
+    originalInlineDescriptions.delete(anchor);
     anchor.style.removeProperty('--notandia-profile-color');
+    anchor.style.removeProperty('--notandia-profile-ink');
     managedInlineAnchors.delete(anchor);
   }
 
@@ -162,7 +174,13 @@
         anchor.classList.add('notandia-publisher-citation');
         anchor.setAttribute(INLINE_ACTION_ATTRIBUTE, visual.action);
         anchor.setAttribute(INLINE_PROFILE_ATTRIBUTE, visual.profileId);
+        if (!managedInlineAnchors.has(anchor)) {
+          originalInlineDescriptions.set(anchor, anchor.getAttribute('aria-description'));
+        }
+        const description = originalInlineDescriptions.get(anchor);
+        anchor.setAttribute('aria-description', [description, `Publisher: ${visual.profileName}`, api.publicationTypeLabel(visual.publicationType)].filter(Boolean).join('. '));
         anchor.style.setProperty('--notandia-profile-color', visual.color);
+        anchor.style.setProperty('--notandia-profile-ink', api.readableColor(visual.color));
         managedInlineAnchors.add(anchor);
         styled.push(anchor);
       }
@@ -178,9 +196,9 @@
     style.id = 'notandia-publisher-profile-styles';
     style.textContent = `
       .notandia-publisher-badges{display:flex!important;flex-wrap:wrap!important;gap:4px!important;margin:3px 0 5px!important;font:600 12px/1.4 system-ui,-apple-system,sans-serif!important}
-      .notandia-publisher-badge{display:inline-flex!important;align-items:center!important;border:1px solid var(--notandia-profile-color)!important;border-radius:999px!important;padding:2px 6px!important;color:var(--notandia-profile-color)!important;background:#fff!important;letter-spacing:.01em!important}
+      .notandia-publisher-badge{display:inline-flex!important;align-items:center!important;border:1px solid var(--notandia-profile-color)!important;border-radius:999px!important;padding:2px 6px!important;color:var(--notandia-profile-ink,#12263F)!important;background:#fff!important;letter-spacing:.01em!important}
       .notandia-publisher-citation[data-notandia-publisher-action="highlight"]:not(.notandia-integrity-citation),
-      .notandia-publisher-citation[data-notandia-publisher-action="highlight"]:not(.notandia-integrity-citation) *{color:var(--notandia-profile-color)!important;font-weight:800!important;text-decoration-line:underline!important;text-decoration-style:dotted!important;text-decoration-color:var(--notandia-profile-color)!important;text-decoration-thickness:2px!important;text-underline-offset:2px!important}
+      .notandia-publisher-citation[data-notandia-publisher-action="highlight"]:not(.notandia-integrity-citation) *{color:var(--notandia-profile-ink,#12263F)!important;background-color:#fff!important;font-weight:800!important;text-decoration-line:underline!important;text-decoration-style:dotted!important;text-decoration-color:currentColor!important;text-decoration-thickness:2px!important;text-underline-offset:2px!important}
       .notandia-publisher-citation[data-notandia-publisher-action="dim"]:not(.notandia-integrity-citation){opacity:.45!important}
       .notandia-publisher-citation[data-notandia-publisher-action="hide"]:not(.notandia-integrity-citation){display:none!important}
     `;
@@ -206,9 +224,15 @@
       maxTextLength: 500
     });
 
+    // Publish DOI/domain matches immediately. Optional metadata must not hold
+    // already-identifiable references behind a slow or unavailable provider.
+    renderAndPublish(referenceRecords, searchRecords, all);
     await sourceContext.resolveRecordsWithNcbi(all, ncbiEnabled);
     if (generation !== scanGeneration) return;
+    renderAndPublish(referenceRecords, searchRecords, all);
+  }
 
+  function renderAndPublish(referenceRecords, searchRecords, all) {
     for (const record of all) record.matches = api.matchProfiles(settings, profileEvidence(record));
     const allElements = new Set(all.map(record => record.element));
     const previousElements = new Set([...managedElements, ...document.querySelectorAll(`[${STYLE_ATTRIBUTE}]`)]);
@@ -231,23 +255,29 @@
     const currentArticle = {
       doi: currentEvidence.dois[0] || null,
       matches: api.matchProfiles(settings, {
+        primaryDoi: currentEvidence.dois[0],
         dois: currentEvidence.dois,
-        hostnames: currentEvidence.hostnames
+        hostnames: currentEvidence.hostnames,
+        urls: currentEvidence.urls,
+        journalNames: currentEvidence.journalNames,
+        publisherNames: currentEvidence.publisherNames
       })
     };
     const references = referenceRecords.filter(record => record.matches.length).map(serializeRecord);
     const searchResults = searchRecords.filter(record => record.matches.length).map(serializeRecord);
+    const coverage = { referencesScanned: referenceRecords.length, searchResultsScanned: searchRecords.length };
     const fingerprint = JSON.stringify([
+      coverage,
       settings,
       ncbiEnabled,
       currentArticle,
-      references.map(record => [record.id, record.number, record.doi, record.matches.map(match => [match.profileId, match.action, match.confidence])]),
-      searchResults.map(record => [record.id, record.number, record.doi, record.matches.map(match => [match.profileId, match.action, match.confidence])])
+      references.map(record => [record.id, record.number, record.doi, record.matches.map(match => [match.profileId, match.action, match.confidence, match.publicationType])]),
+      searchResults.map(record => [record.id, record.number, record.doi, record.matches.map(match => [match.profileId, match.action, match.confidence, match.publicationType])])
     ]);
     if (fingerprint === lastFingerprint) return;
     lastFingerprint = fingerprint;
     chrome.runtime.sendMessage(
-      { type: 'publisherContextUpdate', data: { currentArticle, references, searchResults } },
+      { type: 'publisherContextUpdate', data: { currentArticle, references, searchResults, coverage } },
       () => void chrome.runtime.lastError
     );
   }
@@ -268,9 +298,9 @@
   function loadSettings() {
     chrome.storage.sync.get({
       publisherWatchlist: null,
-      mode: 'highlight',
-      highlightPotentialMdpiSites: true,
-      potentialMdpiHighlightColor: '#E2211C',
+      mode: null,
+      highlightPotentialMdpiSites: null,
+      potentialMdpiHighlightColor: null,
       ncbiApiEnabled: false
     }, stored => {
       if (chrome.runtime.lastError) return;

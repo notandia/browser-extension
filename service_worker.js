@@ -1,7 +1,7 @@
 'use strict';
 
 importScripts(
-  'shared/publisher_profiles.js',
+  'shared/community_publishing_data.js', 'shared/community_publishing.js', 'shared/publisher_profiles.js',
   'shared/integrity.js',
   'background_support.js',
   'background.js',
