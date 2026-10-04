@@ -1,7 +1,7 @@
 'use strict';
 
 if (typeof importScripts === 'function') {
-  if (!globalThis.NotandiaPublisherProfiles) importScripts('shared/publisher_profiles.js');
+  if (!globalThis.NotandiaPublisherProfiles) importScripts('shared/community_publishing_data.js', 'shared/community_publishing.js', 'shared/publisher_profiles.js');
   if (!globalThis.MDPIIntegrity) importScripts('shared/integrity.js');
 }
 
@@ -94,11 +94,11 @@ function currentProfileMap() {
   return publisherApi.profileMap(publisherSettings);
 }
 
-function normalizePublisherMatch(match) {
+function normalizePublisherMatch(match, profiles = currentProfileMap()) {
   if (!match || typeof match !== 'object') return null;
   const profileId = String(match.profileId || '').trim().toLowerCase();
   if (!SAFE_PROFILE_ID.test(profileId)) return null;
-  const profile = currentProfileMap().get(profileId);
+  const profile = profiles.get(profileId);
   if (!profile?.enabled) return null;
   const reasons = Array.isArray(match.reasons)
     ? match.reasons.map(value => String(value).slice(0, 40)).filter(value => /^[a-z0-9-]+$/i.test(value)).slice(0, 6)
@@ -109,16 +109,18 @@ function normalizePublisherMatch(match) {
     confidence: match.confidence === 'potential' ? 'potential' : 'confirmed',
     reasons,
     action: profile.action,
-    color: profile.color
+    color: profile.color,
+    ...(profile.id === 'mdpi' && profile.source === 'builtin' && publisherApi.publicationTypeLabel(match.publicationType)
+      ? { publicationType: match.publicationType } : {})
   };
 }
 
-function normalizePublisherRecord(record, index, kind) {
+function normalizePublisherRecord(record, index, kind, profiles = currentProfileMap()) {
   if (!record || typeof record !== 'object') return null;
   const id = typeof record.id === 'string' && SAFE_REFERENCE_ID.test(record.id)
     ? record.id
     : `notandia-${kind}-${index + 1}`;
-  const matches = Array.isArray(record.matches) ? record.matches.map(normalizePublisherMatch).filter(Boolean) : [];
+  const matches = Array.isArray(record.matches) ? record.matches.map(match => normalizePublisherMatch(match, profiles)).filter(Boolean) : [];
   if (!matches.length) return null;
   return {
     id,
@@ -146,8 +148,9 @@ function summarizePublisherContext(report) {
 }
 
 function normalizePublisherContext(data) {
+  const profiles = currentProfileMap();
   const currentMatches = Array.isArray(data?.currentArticle?.matches)
-    ? data.currentArticle.matches.map(normalizePublisherMatch).filter(Boolean)
+    ? data.currentArticle.matches.map(match => normalizePublisherMatch(match, profiles)).filter(Boolean)
     : [];
   const report = {
     currentArticle: currentMatches.length ? {
@@ -155,11 +158,14 @@ function normalizePublisherContext(data) {
       doi: normalizeDOI(data?.currentArticle?.doi || ''), text: 'Current article', matches: currentMatches
     } : null,
     references: (Array.isArray(data?.references) ? data.references : []).slice(0, MAX_INTEGRITY_REFERENCES)
-      .map((record, index) => normalizePublisherRecord(record, index, 'reference')).filter(Boolean),
+      .map((record, index) => normalizePublisherRecord(record, index, 'reference', profiles)).filter(Boolean),
     searchResults: (Array.isArray(data?.searchResults) ? data.searchResults : []).slice(0, MAX_INTEGRITY_REFERENCES)
-      .map((record, index) => normalizePublisherRecord(record, index, 'search-result')).filter(Boolean),
+      .map((record, index) => normalizePublisherRecord(record, index, 'search-result', profiles)).filter(Boolean),
     updatedAt: new Date().toISOString()
   };
+  if (Number.isInteger(data?.coverage?.referencesScanned) && data.coverage.referencesScanned >= report.references.length && data.coverage.referencesScanned <= MAX_INTEGRITY_REFERENCES) {
+    report.coverage = { referencesScanned: data.coverage.referencesScanned };
+  }
   report.summary = summarizePublisherContext(report);
   return report;
 }
@@ -259,6 +265,12 @@ async function getActiveTab() {
 }
 
 async function hasIntegrityTransmissionConsent() {
+  const enabled = await new Promise(resolve => {
+    chrome.storage.sync.get({ integrityLookupsEnabled: false }, stored => {
+      resolve(!chrome.runtime.lastError && stored.integrityLookupsEnabled === true);
+    });
+  });
+  if (!enabled) return false;
   const optional = chrome.runtime.getManifest().browser_specific_settings?.gecko?.data_collection_permissions?.optional;
   if (!Array.isArray(optional) || !optional.includes('websiteContent')) return true;
   if (!globalThis.browser?.permissions) return false;
@@ -272,6 +284,9 @@ async function hasIntegrityTransmissionConsent() {
 
 async function fetchCrossrefJson(url, controller) {
   await waitForCrossrefStart();
+  if (controller.signal.aborted || !(await hasIntegrityTransmissionConsent())) {
+    throw new DOMException('Lookup disabled', 'AbortError');
+  }
   const response = await fetch(url, {
     method: 'GET', credentials: 'omit', referrerPolicy: 'no-referrer',
     headers: { Accept: 'application/json' }, signal: controller.signal
@@ -365,9 +380,9 @@ async function processIntegrityScan(tabId, data) {
 function refreshPublisherSettings() {
   chrome.storage.sync.get({
     publisherWatchlist: null,
-    mode: 'highlight',
-    highlightPotentialMdpiSites: true,
-    potentialMdpiHighlightColor: '#E2211C'
+    mode: null,
+    highlightPotentialMdpiSites: null,
+    potentialMdpiHighlightColor: null
   }, stored => {
     if (chrome.runtime.lastError) return;
     publisherSettings = publisherApi.migrateLegacySettings(stored);
@@ -495,7 +510,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 refreshPublisherSettings();
 chrome.runtime.onInstalled.addListener(refreshPublisherSettings);
 chrome.runtime.onStartup.addListener(refreshPublisherSettings);
-chrome.storage.onChanged.addListener(changes => {
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'sync') return;
+  if (changes.integrityLookupsEnabled?.newValue !== undefined && changes.integrityLookupsEnabled.newValue !== true) {
+    for (const tabId of activeIntegrityScans.keys()) cancelIntegrityScan(tabId);
+    for (const tabId of integrityTabData.keys()) {
+      integrityTabData.delete(tabId);
+      refreshBadge(tabId);
+      chrome.runtime.sendMessage({ type: 'integrityReportUpdated', tabId }, () => void chrome.runtime.lastError);
+    }
+  }
   if (changes.publisherWatchlist || changes.mode || changes.highlightPotentialMdpiSites || changes.potentialMdpiHighlightColor) refreshPublisherSettings();
 });
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {

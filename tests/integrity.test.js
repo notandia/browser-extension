@@ -238,7 +238,7 @@ test('all browser targets load publisher, integrity, and recovery runtimes safel
   assert.match(serviceWorker, /background_live_context\.js/);
   assert.match(serviceWorker, /background_ncbi_priority\.js/);
   assert.deepEqual(firefox.background.scripts, [
-    'shared/publisher_profiles.js',
+    'shared/community_publishing_data.js', 'shared/community_publishing.js', 'shared/publisher_profiles.js',
     'shared/integrity.js',
     'background_support.js',
     'background.js',

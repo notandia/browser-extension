@@ -22,7 +22,7 @@ test('popup presents one integrated clickable context overview', () => {
   assert.match(html, /<script src="popup_overview\.js"><\/script>/);
   assert.match(html, /<details class="report-section">/);
 
-  assert.match(overview, /settings\.profiles \|\| \[\]/);
+  assert.match(overview, /api\.effectiveProfiles\(settings\)/);
   assert.match(overview, /`profile:\$\{profile\.id\}`/);
   assert.match(overview, /publisher-signal-card/);
   assert.match(overview, /el\.filter\.dispatchEvent\(new Event\('change'/);
@@ -141,4 +141,104 @@ test('reference filter totals exclude the current article and deduplicate works 
   });
   assert.equal(nodes.retracted.textContent, '1');
   assert.equal(nodes.corrected.textContent, '1');
+});
+
+function overviewHarness({ report = null, scanning = false, connected = true } = {}) {
+  const vm = require('node:vm');
+  const { parseHTML } = require('linkedom');
+  const { document } = parseHTML(source('popup.html'));
+  let ready;
+  let onMessage;
+  let rescans = 0;
+  let reloads = 0;
+  const timers = [];
+  const chrome = {
+    runtime: {
+      sendMessage(message, cb) {
+        cb(message.type === 'getPublisherContext' ? { report, settings: profiles.defaultSettings() }
+          : message.type === 'getContextScanState' ? { publisherScanning: scanning } : { report: null });
+      },
+      onMessage: { addListener: fn => { onMessage = fn; } }
+    },
+    tabs: {
+      query: (_, cb) => cb([{ id: 1, url: 'https://www.mdpi.com/2073-445X/15/8/1343' }]),
+      sendMessage: (_, message, cb) => {
+        assert.equal(message.type, 'forcePublisherRescan');
+        rescans++;
+        chrome.runtime.lastError = connected ? undefined : { message: 'No receiver' };
+        cb(connected ? { scheduled: true } : undefined);
+        chrome.runtime.lastError = undefined;
+      },
+      reload: (_, cb) => { reloads++; cb(); }
+    },
+    storage: { onChanged: { addListener() {} } }
+  };
+  document.addEventListener = (event, fn) => { if (event === 'DOMContentLoaded') ready = fn; };
+  const profiles = require('../shared/publisher_profiles.js');
+  vm.runInNewContext(source('popup_overview.js'), {
+    document, chrome, NotandiaPublisherProfiles: profiles, Event: document.defaultView.Event,
+    setTimeout: fn => { timers.push(fn); }
+  });
+  ready();
+  return { document, rescans: () => rescans, reloads: () => reloads,
+    update(value) { report = value; scanning = false; onMessage({ type: 'publisherContextUpdated' }); },
+    timers };
+}
+
+test('popup recovers an empty scan rather than declaring a completed zero count', () => {
+  const h = overviewHarness({ report: { references: [], searchResults: [] }, scanning: true });
+  assert.equal(h.rescans(), 1);
+  assert.equal(h.document.getElementById('countAllContext').textContent, '—');
+  assert.equal(h.document.getElementById('contextOverviewHeading').textContent, 'Checking this page…');
+  h.update({ references: [25, 26, 50].map(number => ({ number, id: `B${number}`, matches: [{ profileId: 'mdpi' }] })) });
+  assert.equal(h.document.getElementById('countAllContext').textContent, '3');
+  assert.equal(h.document.querySelector('[data-context-filter="profile:mdpi"] strong').textContent, '3');
+  assert.equal(h.rescans(), 1);
+});
+
+test('popup offers page refresh when an updated extension cannot reach the old content script', () => {
+  const h = overviewHarness({ connected: false });
+  const button = h.document.getElementById('refreshContextPage');
+  assert.equal(button.hidden, false);
+  assert.equal(h.document.getElementById('contextScanState').hidden, true);
+  assert.match(h.document.getElementById('contextOverviewSummary').textContent, /after installation or an update/);
+  button.click();
+  assert.equal(h.reloads(), 1);
+  assert.equal(button.hidden, true);
+});
+
+
+test('coverage counts bibliography entries and does not invent a denominator for older reports', () => {
+  const references = [25, 26, 50].map(number => ({ number, id: `B${number}`, matches: [{ profileId: 'mdpi' }] }));
+  const h = overviewHarness({ report: { references, searchResults: [], coverage: { referencesScanned: 50 }, currentArticle: { matches: [{ profileId: 'mdpi' }] } } });
+  assert.match(h.document.getElementById('contextOverviewSummary').textContent, /3 of 50 scanned references match your watchlist/);
+  h.update({ references, searchResults: [] });
+  assert.doesNotMatch(h.document.getElementById('contextOverviewSummary').textContent, /scanned references/);
+});
+
+test('citation explanations retain native link and disclosure keyboard interaction', () => {
+  const vm = require('node:vm');
+  const { parseHTML } = require('linkedom');
+  const { document } = parseHTML('<ul><li data-ref-id="B25"><details><summary>Why MDPI is included</summary><a href="https://beallslist.net/">Source</a></details></li></ul>');
+  const popup = source('popup.js');
+  const start = popup.indexOf("  el.contextList.addEventListener('click'");
+  const end = popup.indexOf("  el.save.addEventListener", start);
+  const handlers = {};
+  const messages = [];
+  vm.runInNewContext(popup.slice(start, end), {
+    el: { contextList: { addEventListener: (event, handler) => { handlers[event] = handler; } } },
+    chrome: { runtime: { sendMessage: message => messages.push(message) } }
+  });
+  for (const selector of ['summary', 'a']) {
+    let prevented = false;
+    const event = { target: document.querySelector(selector), key: 'Enter', preventDefault: () => { prevented = true; } };
+    handlers.click(event);
+    handlers.keydown(event);
+    assert.equal(prevented, false);
+    assert.equal(messages.length, 0);
+  }
+  let prevented = false;
+  handlers.keydown({ target: document.querySelector('li'), key: 'Enter', preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(messages[0].refId, 'B25');
 });

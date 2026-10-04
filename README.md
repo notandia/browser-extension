@@ -21,14 +21,23 @@ All packages are generated from the same source commit. Browser-specific manifes
 
 - Identify enabled publisher profiles in article pages, reference lists, and supported search-result pages.
 - Ship built-in MDPI and Frontiers profiles, both enabled and highlighted by default on fresh installations.
+- Distinguish MDPI in amber and Frontiers in violet, with visible publisher names as well as color. Existing saved colors and actions are preserved.
 - Allow every publisher profile—including MDPI—to be independently enabled or disabled.
 - Apply a per-publisher action: context only, badge, highlight, dim, or hide.
 - Configure a separate color and confirmed-only or potential-match policy for each profile.
-- Add validated custom profiles using publisher domains and DOI prefixes.
-- Import and export profile settings as versioned, declarative JSON; custom profiles cannot contain scripts or executable selectors.
 - Preserve the mature MDPI detector as an additional evidence source for pages where direct publisher domains or DOI prefixes are unavailable.
 
 A watchlist match identifies a publisher selected in the user's settings. It is not a quality score and does not claim that every article from a matched publisher is unreliable.
+
+MDPI preserves the project's original MDPI Filter focus. Frontiers expands the initial scrutiny watchlist. Settings include the selection rationale, dated source review, and links to [Finland's classification decision](https://julkaisufoorumi.fi/en/news/changes-classification) and [Norway's journal-by-journal approach](https://kanalregister.hkdir.no/en/aktuelt/new-criteria-for-level-1). Exceptions, restorations, and differences between assessment systems matter; Notandia does not retrieve current journal classifications or designate these entire publishers as predatory.
+
+Settings provide MDPI and Frontiers controls, manual publisher adding, import/export, Reset defaults, diagnostic logging and Crossref/NCBI checks. Preset catalogues are deferred. Existing saved profiles remain usable and can be removed from Settings. Reference details retain attributed sources, and the overview reports watchlist matches against scanned references when coverage is available.
+
+The optional **Additional publisher and journal warnings** setting uses the full bundled Cite Unseen publisher and standalone-journal lists: 1,334 publisher URL entries and 1,498 journal URL entries, dated 30 March 2026. Matching runs locally, preserving listed paths and query selectors. Each match links to its source and edition. Saved publisher and manual domain controls take precedence, including disabled choices. Import/export includes the setting. See [data attribution and licence](shared/COMMUNITY_DATA_NOTICE.md).
+
+MDPI detection includes the five DOI prefixes listed by CiteWatch and verified against Crossref; Frontiers detection includes `10.3389` and `10.4175`. Preprints.org references carry a **Preprint** label and platform explanation; recognised Encyclopedia DOI entries carry an **Encyclopedia entry** label. These labels describe the cited work's type.
+
+For a local presentation, open [the synthetic demo](docs/presentation-demo.html). It uses the actual publisher matcher and notice renderer with invented records to demonstrate distinct publisher colors and formal notices outside the initial watchlist. It performs no API requests and makes no claims about real articles. See [accessibility validation](docs/ACCESSIBILITY_PRESETS.md) for checks and limits.
 
 ### Integrated article and reference context
 
@@ -42,7 +51,7 @@ A watchlist match identifies a publisher selected in the user's settings. It is 
 - Optionally check the current article and DOI-bearing references for formal Crossref/Retraction Watch update relationships.
 - Query both a work's direct Crossref metadata and reverse `updates:<doi>` relationships so separately registered notices can be found.
 - Show evidence type, chronology, provenance, coverage, deferred checks, and unresolved checks instead of producing an opaque quality score.
-- Keep research-integrity lookups off by default and allow NCBI and integrity network features to be disabled independently.
+- Offer a prominent first-use prompt to enable recommended Crossref and NCBI checks together. Both remain off until enabled, can be controlled independently, and a choice to keep current settings is remembered on the device.
 
 ## Defaults and migration
 
@@ -176,3 +185,5 @@ Representative regression pages include PubMed Central, Europe PMC, Nature, Fron
 
 - Code: [GNU AGPL-3.0-or-later](LICENSE-CODE)
 - Logo: [CC BY-SA 4.0](LICENSE-LOGO)
+
+The same optional warning group includes Wikipedia CiteWatch’s publisher and journal configurations (1,381 and 2,122 records). It matches additional DOI prefixes and structured journal/publisher metadata locally. Explanations include dated sources and assessment notes. Ambiguous names, shared prefixes and journal-specific exceptions restrict matching; these signals are marked as potential. See [bundled source coverage](docs/PUBLISHING_CONCERNS_SOURCES.md).

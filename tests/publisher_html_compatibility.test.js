@@ -22,7 +22,7 @@ function page(html, url = 'https://example.org/article') {
   vm.createContext(context);
   context.load = file => vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   for (const file of [
-    'shared/work_identifiers.js', 'shared/publisher_profiles.js',
+    'shared/work_identifiers.js', 'shared/community_publishing_data.js', 'shared/community_publishing.js', 'shared/publisher_profiles.js',
     'content/reference_selectors.js', 'content/link_extraction_selectors.js',
     'content/link_extractor.js', 'content/item_content_checker.js',
     'content/reference_id_extractor.js', 'content/inline_footnote_selectors.js',
@@ -186,4 +186,87 @@ test('Scholar uses the canonical title DOI before a PDF mirror path', () => {
   const context = page(`<div class="gs_r"><a href="https://link.springer.com/content/pdf/10.1007/s13312-020-1852-4.pdf">PDF</a><h3 class="gs_rt"><a href="https://link.springer.com/article/10.1007/s13312-020-1852-4">Paper title</a></h3></div>`, 'https://scholar.google.com/scholar?q=PMC7102549');
   const record = context.NotandiaSourceContext.buildRecord(context.document.querySelector('.gs_r'), 0, 'search-result');
   assert.equal(record.doi, '10.1007/s13312-020-1852-4');
+});
+
+test('MDPI Land layout reports its three watched references and styles their original inline numbers', async () => {
+  // Reduced contract inspected on https://www.mdpi.com/2073-445X/15/8/1343.
+  const dois = new Map([[25, '10.3390/land10050474'], [26, '10.3390/land13121999'], [50, '10.3390/land13070942']]);
+  const references = Array.from({ length: 50 }, (_, i) => {
+    const number = i + 1;
+    return `<li id="B${number}-land-15-01343" class="html-${number < 10 ? 'x' : 'xx'}" data-content="${number}.">Synthetic reference ${number}. <a href="https://doi.org/${dois.get(number) || `10.1234/example${number}`}">CrossRef</a></li>`;
+  }).join('');
+  const c = page(`<p>${[24, 25, 26, 50].map(n => `<a id="inline${n}" class="html-bibr" href="#B${n}-land-15-01343" title="" ${n === 25 ? 'aria-description="Existing description"' : ''}>${n}</a>`).join(', ')}</p><section id="html-references_list"><ol class="html-xx">${references}</ol></section>`, 'https://www.mdpi.com/2073-445X/15/8/1343');
+  const articleDoi = c.document.createElement('meta');
+  articleDoi.setAttribute('name', 'citation_doi');
+  articleDoi.setAttribute('content', '10.3390/land15081343');
+  c.document.head.appendChild(articleDoi);
+  // Linkedom lacks CSSStyleDeclaration.getPropertyPriority.
+  Object.getPrototypeOf(c.document.body.style).getPropertyPriority ||= () => '';
+  c.load('content/domains.js');
+  const timers = new Map();
+  let timerId = 0;
+  c.setTimeout = (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; };
+  c.clearTimeout = id => timers.delete(id);
+  c.MutationObserver = class { observe() {} disconnect() {} };
+  const messages = [];
+  let storageChanged;
+  let stored = {};
+  c.chrome = {
+    runtime: { id: 'test-extension', onMessage: { addListener() {} }, sendMessage: (m, cb) => { messages.push(m); cb?.(); } },
+    storage: { sync: { get: (defaults, cb) => cb({ ...defaults, ...stored }), set: values => { stored = { ...stored, ...values }; } }, onChanged: { addListener: fn => { storageChanged = fn; } } }
+  };
+  const scan = async () => {
+    const [id, timer] = [...timers].find(([, t]) => t.delay === 0);
+    timers.delete(id);
+    timer.fn();
+    await new Promise(resolve => setImmediate(resolve));
+  };
+  c.load('content/publisher_profile_scanner.js');
+  await scan();
+  const report = messages.at(-1).data;
+  assert.equal(c.NotandiaSourceContext.collectRecords().references.length, 50);
+  assert.equal(report.coverage.referencesScanned, 50);
+  assert.deepEqual(Array.from(report.references, r => r.number), [25, 26, 50]);
+  assert.equal(report.currentArticle.doi, '10.3390/land15081343');
+  assert.equal(report.currentArticle.matches[0].profileId, 'mdpi');
+  assert.equal(c.document.querySelectorAll('.notandia-publisher-citation').length, 3);
+  for (const n of [25, 26, 50]) {
+    const anchor = c.document.getElementById(`inline${n}`);
+    assert.equal(anchor.textContent, String(n));
+    assert.match(anchor.getAttribute('aria-description'), /Publisher: MDPI/);
+    assert.equal(anchor.getAttribute('title'), '');
+  }
+  assert.equal(c.document.getElementById('inline24').classList.contains('notandia-publisher-citation'), false);
+  assert.doesNotMatch(c.document.getElementById('notandia-publisher-profile-styles').textContent, /::after/);
+  stored.publisherWatchlist.profiles[0].enabled = false;
+  storageChanged({ publisherWatchlist: {} }, 'sync');
+  await scan();
+  assert.equal(messages.at(-1).data.references.length, 0);
+  assert.equal(c.document.querySelectorAll('.notandia-publisher-citation').length, 0);
+  assert.equal(c.document.getElementById('inline25').getAttribute('aria-description'), 'Existing description');
+  assert.equal(c.document.getElementById('inline26').hasAttribute('aria-description'), false);
+});
+
+test('local publisher matches are published while optional NCBI resolution is pending', async () => {
+  const c = page(`<li class="html-xx" id="B25-paper">${doiLink}</li><li class="html-xx" id="B26-paper"><a href="https://pubmed.ncbi.nlm.nih.gov/12345/">PubMed</a></li>`);
+  Object.getPrototypeOf(c.document.body.style).getPropertyPriority ||= () => '';
+  c.load('content/domains.js');
+  const timers = [];
+  c.setTimeout = (fn, delay) => { timers.push({ fn, delay }); return timers.length; };
+  c.clearTimeout = () => {};
+  c.MutationObserver = class { observe() {} };
+  let finishResolution;
+  c.NotandiaNcbiApiHandler = { resolveNcbiIdsToDois: () => new Promise(resolve => { finishResolution = resolve; }) };
+  const reports = [];
+  c.chrome = {
+    runtime: { onMessage: { addListener() {} }, sendMessage: (message, cb) => { reports.push(message.data); cb?.(); } },
+    storage: { sync: { get: (defaults, cb) => cb({ ...defaults, ncbiApiEnabled: true }), set() {} }, onChanged: { addListener() {} } }
+  };
+  c.load('content/publisher_profile_scanner.js');
+  timers.find(timer => timer.delay === 0).fn();
+  assert.equal(reports.length, 1, 'no provider response is required to show a direct DOI match');
+  assert.equal(reports[0].references[0].number, 25);
+  finishResolution({ status: 'resolved', doiById: new Map([['12345', '10.3390/resolved']]) });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(reports.at(-1).references.length, 2, 'metadata enriches the first local result');
 });

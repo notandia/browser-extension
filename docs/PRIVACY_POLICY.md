@@ -1,6 +1,6 @@
 # Privacy Policy for the Notandia Browser Extension
 
-**Last updated:** July 29, 2026
+**Last updated:** October 4, 2026
 
 Notandia, previously distributed as MDPI Filter, adds configurable publisher context and optional formal post-publication signals while users read scholarly literature. Most processing occurs locally in the browser.
 
@@ -22,9 +22,11 @@ User preferences are stored through browser extension storage. Browser synchroni
 
 ## 2. External communications
 
+Both services are off by default for new installations. The first-use prompt explains identifier transmission and offers activation of both checks or individual choices in Settings. Once enabled, requests run automatically when pages expose relevant article or reference identifiers. Users can decline without losing local publisher matching, disable either service independently using its toggle in Quick settings and saving the settings. Setup dismissal is remembered locally on the device. Identifier requests can reveal reading interests when combined with network metadata such as the user's IP address.
+
 ### NCBI ID Converter
 
-When NCBI lookups are enabled, the extension sends only validated DOI, PMID, or PMCID values to the NCBI ID Converter. Requests identify the application as `notandia` and omit browser cookies, other credentials, referrer information, and a developer email address.
+When NCBI lookups are enabled, the extension sends validated DOI, PMID, or PMCID values to the NCBI ID Converter. Requests include the provider-required public client label `NotandiaBrowser` and public maintainer contact. These identify the application, not the user. Requests omit browser cookies, other credentials and referrer information. NCBI receives normal network metadata, including the user's IP address.
 
 NCBI lookups are bounded, deduplicated, batched, and time-limited. They can be disabled in advanced settings; disabling them may reduce publisher-detection coverage when a result exposes only PubMed or PMC identifiers.
 
@@ -41,7 +43,7 @@ Crossref requests:
 - are limited to no more than 50 unique DOI records per page scan and four request starts per second;
 - are cancelled when the feature is disabled, the scan is replaced, or navigation begins.
 
-Firefox additionally requires the user to grant its optional `websiteContent` data-collection permission before these DOI requests can begin.
+Firefox additionally requires the user to grant its optional `websiteContent` data-collection permission before either Crossref or NCBI identifier requests can begin.
 
 ### User-initiated GitHub reports
 

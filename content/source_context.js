@@ -154,21 +154,23 @@
       .slice(0, Math.max(0, maxLength));
   }
 
-  function addHostname(set, value) {
+  function addHostname(set, value, urls) {
     // In-page footnote backlinks describe navigation, not the cited publisher.
     if (!String(value || '').trim() || String(value).trim().startsWith('#')) return;
     try {
       const url = new URL(String(value || ''), document.baseURI);
       if (!/^https?:$/.test(url.protocol)) return;
       set.add(url.hostname.toLowerCase().replace(/^www\./, ''));
+      urls?.add(url.href);
     } catch {}
   }
 
-  function evidenceFromValues(values, hostnames, options) {
+  function evidenceFromValues(values, hostnames, options, urls = []) {
     const identity = workIds.extract(values, options);
     return {
       identity,
       hostnames: Array.from(hostnames || []).sort(),
+      urls: Array.from(urls),
       dois: Array.from(identity.identifiers.doi || []),
       pmids: Array.from(identity.identifiers.pmid || []),
       pmcids: Array.from(identity.identifiers.pmcid || []),
@@ -194,6 +196,7 @@
 
   function evidenceFromElement(element, text = cleanText(element), kind = 'reference') {
     const hostnames = new Set();
+    const urls = new Set();
     // The 500-character popup excerpt is not an identity-extraction limit: a
     // long author list can put the DOI at the end of a perfectly valid citation.
     const evidenceText = cleanText(element, 20000) || text;
@@ -207,7 +210,7 @@
       ) || [];
       values.push(...configuredValues);
       for (const value of configuredValues) {
-        if (/^(?:https?:)?\/\//i.test(value)) addHostname(hostnames, value);
+        if (/^(?:https?:)?\/\//i.test(value)) addHostname(hostnames, value, urls);
       }
     }
     // Scholar's canonical title destination precedes PDF mirrors, whose paths
@@ -239,13 +242,15 @@
       const linkValue = linkExtractor?.referenceLinkValue?.(href) ?? href;
       values.push(linkValue, link.getAttribute('data-doi') || '');
       addEuropePmcIdentifierValue(values, href);
-      if (linkValue === href) addHostname(hostnames, href);
+      if (linkValue === href) addHostname(hostnames, href, urls);
     }
     const evidence = evidenceFromValues(values, hostnames, {
       source: 'notandia-source-context',
       method: 'page-evidence',
       confidence: 'exact'
-    });
+    }, urls);
+    evidence.journalNames = Array.from(element.querySelectorAll?.('.journal-title,[itemprop="isPartOf"] [itemprop="name"],cite[itemprop="isPartOf"]') || [], node => node.textContent?.trim()).filter(Boolean);
+    evidence.publisherNames = Array.from(element.querySelectorAll?.('[itemprop="publisher"] [itemprop="name"],[itemprop="publisher"]:not(:has([itemprop="name"]))') || [], node => node.textContent?.trim()).filter(Boolean);
     evidence.profileSignals = kind === 'search-result' ? [] : window.MDPIFilterItemContentChecker?.publisherHints?.(
       evidenceText, element.querySelector?.('[itemprop="isPartOf"] [itemprop="name"],.journal-title')?.textContent
     ) || [];
@@ -256,6 +261,7 @@
     // A search URL describes a query, not a current scholarly article.
     if (activeSearchConfig()) return evidenceFromValues([], new Set(), { source: 'notandia-source-context', method: 'search-page' });
     const hostnames = new Set([location.hostname.toLowerCase().replace(/^www\./, '')]);
+    const urls = new Set([location.href]);
     const values = [];
     for (const selector of [
       'meta[name="citation_doi"]',
@@ -270,11 +276,14 @@
       document.querySelector('link[rel="canonical"]')?.getAttribute('href') || '',
       location.href
     );
-    return evidenceFromValues(values, hostnames, {
+    const evidence = evidenceFromValues(values, hostnames, {
       source: 'notandia-source-context',
       method: 'current-article',
       confidence: 'exact'
-    });
+    }, urls);
+    evidence.journalNames = Array.from(document.querySelectorAll('meta[name="citation_journal_title"]'), node => node.getAttribute('content')).filter(Boolean);
+    evidence.publisherNames = Array.from(document.querySelectorAll('meta[name="citation_publisher"]'), node => node.getAttribute('content')).filter(Boolean);
+    return evidence;
   }
 
   function safeRecordId(element, index, kind) {

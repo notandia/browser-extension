@@ -47,6 +47,7 @@ function appendOptions(select, choices, selected) {
 function renderProfiles() {
   profileList.replaceChildren();
   watchlist = api.sanitizeSettings(watchlist);
+  $('communityWarningsEnabledOptions').checked = watchlist.communityWarningsEnabled;
   for (const profile of watchlist.profiles) {
     const row = document.createElement('div');
     row.className = 'profile-row';
@@ -55,15 +56,50 @@ function renderProfiles() {
     details.className = 'profile-main';
     const name = document.createElement('strong');
     name.textContent = profile.name;
-    if (profile.source === 'builtin') {
+    if (profile.source === 'preset') {
       const chip = document.createElement('span');
       chip.className = 'profile-chip';
-      chip.textContent = 'Built in';
+      chip.textContent = api.profileContext(profile.id) ? 'Publishing concerns' : 'Identification preset';
       name.appendChild(chip);
     }
     const evidence = document.createElement('small');
     evidence.textContent = [profile.domains.join(', '), profile.doiPrefixes.join(', ')].filter(Boolean).join(' · ');
     details.append(name, evidence);
+    if (['builtin', 'preset'].includes(profile.source)) {
+      const context = api.profileContext(profile.id);
+      if (context) {
+        const rationale = document.createElement('details');
+        rationale.className = 'profile-rationale';
+        const summary = document.createElement('summary');
+        summary.textContent = `Why ${profile.name} is included`;
+        const explanation = document.createElement('p');
+        explanation.textContent = `${context.explanation} ${context.evidence} Sources reviewed ${context.reviewed}.`;
+        rationale.append(summary, explanation);
+        for (const source of context.sources) {
+          const link = document.createElement('a');
+          link.href = source.url;
+          link.textContent = source.label;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          rationale.appendChild(link);
+        }
+        details.appendChild(rationale);
+        if (context.testUrl) {
+          const testLink = document.createElement('a');
+          testLink.className = 'profile-test-link';
+          testLink.href = context.testUrl;
+          testLink.textContent = 'Open test page';
+          testLink.setAttribute('aria-label', `Open test page for ${profile.name}`);
+          testLink.target = '_blank';
+          testLink.rel = 'noopener noreferrer';
+          details.appendChild(testLink);
+        }
+      } else {
+        const description = document.createElement('small');
+        description.textContent = 'Added for your own publisher filters.';
+        details.appendChild(description);
+      }
+    }
 
     const enabledLabel = document.createElement('label');
     enabledLabel.className = 'switch-wrap';
@@ -71,12 +107,14 @@ function renderProfiles() {
     enabled.type = 'checkbox';
     enabled.className = 'profile-enabled';
     enabled.checked = profile.enabled;
-    enabledLabel.append(enabled, document.createTextNode('Enabled'));
+    enabled.setAttribute('aria-label', `Enable ${profile.name}`);
+    enabledLabel.append(enabled, document.createTextNode('Enable'));
 
     const actionLabel = document.createElement('label');
     actionLabel.textContent = 'Action';
     const action = document.createElement('select');
     action.className = 'profile-action';
+    action.setAttribute('aria-label', `${profile.name} action`);
     appendOptions(action, [
       ['none', 'Context only'],
       ['badge', 'Badge only'],
@@ -92,12 +130,14 @@ function renderProfiles() {
     color.type = 'color';
     color.className = 'profile-color';
     color.value = profile.color;
+    color.setAttribute('aria-label', `${profile.name} color`);
     colorLabel.appendChild(color);
 
     const confidenceLabel = document.createElement('label');
     confidenceLabel.textContent = 'Match policy';
     const confidence = document.createElement('select');
     confidence.className = 'profile-confidence';
+    confidence.setAttribute('aria-label', `${profile.name} match policy`);
     appendOptions(confidence, [
       ['confirmed-only', 'Confirmed only'],
       ['confirmed-and-potential', 'Include potential']
@@ -127,7 +167,7 @@ function readRows() {
     profile.color = row.querySelector('.profile-color').value;
     profile.confidencePolicy = row.querySelector('.profile-confidence').value;
   }
-  watchlist = api.sanitizeSettings({ ...watchlist, profiles: Array.from(byId.values()) });
+  watchlist = api.sanitizeSettings({ ...watchlist, profiles: Array.from(byId.values()), communityWarningsEnabled: $('communityWarningsEnabledOptions').checked });
   return watchlist;
 }
 
@@ -142,26 +182,25 @@ function commaValues(value) {
 $('addProfile').addEventListener('click', () => {
   readRows();
   const name = $('customName').value.trim();
-  let id = slugify(name);
-  if (!id) return setStatus('Enter a publisher name.', true);
+  const baseId = slugify(name);
+  if (!baseId) return setStatus('Enter a publisher name.', true);
+  if (watchlist.profiles.length >= 50) return setStatus('Remove a publisher before adding another. The limit is 50.', true);
+  let id = baseId;
   const existingIds = new Set(watchlist.profiles.map(profile => profile.id));
   let suffix = 2;
-  while (existingIds.has(id)) id = `${slugify(name).slice(0, 42)}-${suffix++}`;
+  while (existingIds.has(id)) id = `${baseId.slice(0, 42)}-${suffix++}`;
   const profile = api.normalizeProfile({
-    id,
-    name,
+    id, name,
     domains: commaValues($('customDomains').value),
     doiPrefixes: commaValues($('customDoiPrefixes').value),
-    enabled: true,
-    action: $('customAction').value,
-    color: $('customColor').value,
-    confidencePolicy: 'confirmed-only',
-    source: 'custom'
+    enabled: true, action: $('customAction').value, color: $('customColor').value,
+    confidencePolicy: 'confirmed-only'
   });
-  if (!profile) return setStatus('Add at least one valid publisher domain or DOI prefix.', true);
+  if (!profile) return setStatus('Enter a valid domain or DOI prefix.', true);
   watchlist.profiles.push(profile);
-  for (const idToClear of ['customName', 'customDomains', 'customDoiPrefixes']) $(idToClear).value = '';
+  for (const field of ['customName', 'customDomains', 'customDoiPrefixes']) $(field).value = '';
   renderProfiles();
+  profileList.querySelector(`[data-profile-id="${profile.id}"] .profile-enabled`)?.focus();
   setStatus(`${profile.name} added. Save settings to apply it.`);
 });
 
@@ -172,6 +211,8 @@ profileList.addEventListener('click', event => {
   const id = button.closest('.profile-row').dataset.profileId;
   watchlist.profiles = watchlist.profiles.filter(profile => profile.id !== id || profile.source === 'builtin');
   renderProfiles();
+  profileList.querySelector('.profile-enabled')?.focus();
+  setStatus('Publisher removed. Save settings to apply the change.');
 });
 
 $('exportProfiles').addEventListener('click', () => {
@@ -179,7 +220,7 @@ $('exportProfiles').addEventListener('click', () => {
   $('profileJson').value = JSON.stringify(watchlist, null, 2);
   $('profileJson').focus();
   $('profileJson').select();
-  setStatus('Publisher profile JSON prepared for copying.');
+  setStatus('Publisher settings exported. Copy the JSON below.');
 });
 
 $('importProfiles').addEventListener('click', () => {
@@ -191,7 +232,7 @@ $('importProfiles').addEventListener('click', () => {
     renderProfiles();
     setStatus('Profiles imported. Save settings to apply them.');
   } catch {
-    setStatus('The profile JSON is invalid or contains no valid publisher profiles.', true);
+    setStatus('Enter a JSON export containing publisher profiles.', true);
   }
 });
 
@@ -205,22 +246,25 @@ $('save').addEventListener('click', () => {
   void (async () => {
     readRows();
     const integrityEnabled = $('integrityLookupsEnabledOptions').checked;
-    const consent = await setFirefoxDataConsent(integrityEnabled).catch(() => false);
-    if (integrityEnabled && !consent) {
+    const ncbiEnabled = $('ncbiApiEnabledOptions').checked;
+    const consent = await setFirefoxDataConsent(integrityEnabled || ncbiEnabled).catch(() => false);
+    if ((integrityEnabled || ncbiEnabled) && !consent) {
       $('integrityLookupsEnabledOptions').checked = false;
+      $('ncbiApiEnabledOptions').checked = false;
       return setStatus('Firefox data permission was not granted.', true);
     }
     const mdpi = watchlist.profiles.find(profile => profile.id === 'mdpi');
     chrome.storage.sync.set({
       publisherWatchlist: watchlist,
       integrityLookupsEnabled: integrityEnabled,
-      ncbiApiEnabled: $('ncbiApiEnabledOptions').checked,
+      ncbiApiEnabled: ncbiEnabled,
       loggingEnabled: $('loggingEnabledOptions').checked,
       mode: mdpi?.action === 'hide' ? 'hide' : 'highlight',
       highlightPotentialMdpiSites: mdpi?.confidencePolicy === 'confirmed-and-potential',
-      potentialMdpiHighlightColor: mdpi?.color || '#E2211C'
+      potentialMdpiHighlightColor: mdpi?.color || api.BUILTIN_PROFILES[0].color
     }, () => {
       if (chrome.runtime.lastError) return setStatus('Could not save settings.', true);
+      chrome.storage.local?.set({ notandiaLookupSetupDismissed: true }, () => void chrome.runtime.lastError);
       chrome.tabs?.query?.({}, tabs => {
         for (const tab of tabs || []) {
           if (!Number.isInteger(tab.id)) continue;
@@ -236,22 +280,24 @@ $('save').addEventListener('click', () => {
 function load() {
   chrome.storage.sync.get({
     publisherWatchlist: null,
-    mode: 'highlight',
-    highlightPotentialMdpiSites: true,
-    potentialMdpiHighlightColor: '#E2211C',
+    mode: null,
+    highlightPotentialMdpiSites: null,
+    potentialMdpiHighlightColor: null,
     integrityLookupsEnabled: false,
-    ncbiApiEnabled: true,
+    ncbiApiEnabled: false,
     loggingEnabled: false
   }, stored => {
     if (chrome.runtime.lastError) return setStatus('Could not load settings.', true);
     watchlist = api.migrateLegacySettings(stored);
     renderProfiles();
-    $('ncbiApiEnabledOptions').checked = stored.ncbiApiEnabled !== false;
+    $('ncbiApiEnabledOptions').checked = stored.ncbiApiEnabled === true;
     $('loggingEnabledOptions').checked = stored.loggingEnabled === true;
     void hasFirefoxDataConsent().then(permitted => {
       $('integrityLookupsEnabledOptions').checked = stored.integrityLookupsEnabled === true && permitted;
+      $('ncbiApiEnabledOptions').checked = stored.ncbiApiEnabled === true && permitted;
     }).catch(() => {
       $('integrityLookupsEnabledOptions').checked = false;
+      $('ncbiApiEnabledOptions').checked = false;
     });
     if (!stored.publisherWatchlist || stored.publisherWatchlist.schemaVersion !== api.SCHEMA_VERSION) {
       chrome.storage.sync.set({ publisherWatchlist: watchlist });

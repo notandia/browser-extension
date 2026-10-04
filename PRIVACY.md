@@ -1,8 +1,14 @@
 # Privacy policy
 
-Last updated: 9 August 2026
+Last updated: 4 October 2026
 
 Notandia, previously distributed as MDPI Filter, identifies user-selected publisher context and can optionally check scholarly DOI identifiers for formal post-publication updates.
+
+Crossref and NCBI lookups are off by default for new installations. A first-use prompt explains the services, identifiers and automatic requests before offering activation. Users can enable both together or choose them individually in Settings. Keeping current settings is remembered on the device. Either service can be disabled independently using its toggle in Quick settings and saving the settings. Local publisher matching remains available with external checks disabled.
+
+Public scholarly identifiers combined with network metadata can reveal reading interests. Both external services receive normal network metadata, including the user's IP address. Firefox additionally requires its optional website-content data permission before either service can receive identifier requests.
+
+Updates preserve each saved lookup choice independently. Saving individual settings also completes setup on that device; subsequent disablement or upgrades do not reset the remembered choice or repeat the setup prompt.
 
 ## Data processed locally
 

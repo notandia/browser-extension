@@ -18,6 +18,8 @@ Notandia adds transparent publisher context and formal post-publication signals 
 
 Previously distributed as MDPI Filter, Notandia retains its mature MDPI detection and expands it into configurable publisher watchlists. Built-in MDPI and Frontiers profiles are enabled and highlighted by default, and both can be independently disabled or changed.
 
+Optional publisher and journal warnings use bundled Cite Unseen and Wikipedia CiteWatch data, with the source and edition linked from each match. Add your own publisher rules and back them up with import/export. Visible names identify matches, and reference details explain the sources behind each warning.
+
 ### Publisher watchlists
 
 Choose how Notandia treats each enabled publisher profile:

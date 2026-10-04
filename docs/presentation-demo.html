@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notandia — synthetic presentation demo</title>
+  <link rel="stylesheet" href="presentation-demo.css">
+  <link rel="stylesheet" href="../content/integrity_presentation.css">
+</head>
+<body>
+  <main>
+    <h1>Inspect the sources behind a statement</h1>
+    <p class="notice"><strong>Synthetic demonstration.</strong> All papers, identifiers, and notices below are invented. They are not allegations about real publications. This page uses Notandia’s actual publisher matcher and notice presentation with local fixtures; it performs no API lookups.</p>
+    <div class="controls">
+      <button id="optionalPublishers" type="button" aria-pressed="false">Identify Elsevier and Wiley too</button>
+      <button id="darkTheme" type="button" aria-pressed="false">Dark background</button>
+    </div>
+    <p id="demoStatus" role="status">MDPI and Frontiers are highlighted. Formal notices are independent of the publisher watchlist.</p>
+    <section aria-labelledby="claimHeading">
+      <h2 id="claimHeading">An example paragraph</h2>
+      <p>A statement cites an MDPI example <a href="#demo-mdpi">[1]</a> and a Frontiers example <a href="#demo-frontiers">[2]</a>. Other statements cite an Elsevier example <a href="#demo-elsevier">[3]</a> and a Wiley example <a href="#demo-wiley">[4]</a>. Follow each reference to inspect its context.</p>
+    </section>
+    <section aria-labelledby="referencesHeading">
+      <h2 id="referencesHeading">Invented references</h2>
+      <ol>
+        <li id="demo-mdpi" data-publisher="mdpi" data-doi="10.5555/notandia-demo-mdpi">Invented MDPI example. Publisher watchlist match; no formal notice in this fixture.</li>
+        <li id="demo-frontiers" data-publisher="frontiers" data-doi="10.5555/notandia-demo-frontiers">Invented Frontiers example. Publisher watchlist match; no formal notice in this fixture.</li>
+        <li id="demo-elsevier" data-publisher="elsevier" data-doi="10.5555/notandia-demo-elsevier">Invented Elsevier example with a synthetic retraction notice.</li>
+        <li id="demo-wiley" data-publisher="wiley" data-doi="10.5555/notandia-demo-wiley">Invented Wiley example with a synthetic correction notice.</li>
+      </ol>
+    </section>
+    <p>Publisher colors identify your selected profiles. Formal notices describe recorded events. Neither is an automatic assessment of whether a citation supports a statement.</p>
+  </main>
+  <script src="../shared/community_publishing_data.js"></script>
+  <script src="../shared/community_publishing.js"></script>
+  <script src="../shared/publisher_profiles.js"></script>
+  <script src="../shared/integrity.js"></script>
+  <script src="presentation-demo.js"></script>
+  <script src="../content/publisher_profile_scanner.js"></script>
+  <script src="../content/integrity_presentation.js"></script>
+</body>
+</html>

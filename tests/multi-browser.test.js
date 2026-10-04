@@ -67,7 +67,7 @@ test('one source tree generates isolated Notandia browser packages', () => {
     assert.equal(chrome.background.service_worker, 'service_worker.js');
     assert.equal(edge.background.service_worker, 'service_worker.js');
     assert.deepEqual(firefox.background.scripts, [
-      'shared/publisher_profiles.js',
+      'shared/community_publishing_data.js', 'shared/community_publishing.js', 'shared/publisher_profiles.js',
       'shared/integrity.js',
       'background_support.js',
       'background.js',
