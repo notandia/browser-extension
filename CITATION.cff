@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite the archived release corresponding to
+  the version you used. Zenodo release archives will be linked from the repository.
+type: software
+title: "Notandia browser extension: publisher context and research-integrity signals"
+authors:
+  - family-names: Marcolongo
+    given-names: Mario
+    orcid: "https://orcid.org/0000-0003-2846-7115"
+abstract: >-
+  Notandia is an independent, open-source browser extension for configurable
+  publisher context, citation navigation and optional post-publication checks
+  using Crossref and NCBI metadata. It continues the MDPI Filter project.
+  Watchlist matches are contextual signals, not article-quality scores, and an
+  absence of notices does not establish reliability. This repository contains
+  the browser extension; the Notandia Zotero plugin is maintained separately.
+  Code is licensed under AGPL-3.0-or-later. The logo and bundled community data
+  retain their separate CC BY-SA 4.0 licences and attribution notices.
+license: AGPL-3.0-or-later
+repository-code: "https://github.com/notandia/browser-extension"
+url: "https://notandia.pages.dev/"
+keywords:
+  - research integrity
+  - scholarly communication
+  - browser extension
+  - citation navigation
+  - post-publication notices
+  - publisher context
+# Release-specific version and date are deliberately omitted here so a later
+# GitHub release cannot inherit a stale version/date from this citation file.
