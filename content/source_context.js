@@ -3,7 +3,7 @@
 ;(function initializeNotandiaSourceContext() {
   if (window.NotandiaSourceContext) return;
 
-  const workIds = window.NotandiaWorkIdentifiers;
+  const workIds = globalThis.NotandiaWorkIdentifiers;
   if (!workIds) return;
 
   const SAFE_ID = /^[A-Za-z0-9_.:-]{1,256}$/;
