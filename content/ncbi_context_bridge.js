@@ -7,8 +7,8 @@
   const hostname = location.hostname.toLowerCase().replace(/^www\./, '');
   if (!['pubmed.ncbi.nlm.nih.gov', 'pmc.ncbi.nlm.nih.gov'].includes(hostname)) return;
 
-  const api = window.NotandiaPublisherProfiles;
-  const workIdentifiers = window.NotandiaWorkIdentifiers;
+  const api = globalThis.NotandiaPublisherProfiles;
+  const workIdentifiers = globalThis.NotandiaWorkIdentifiers;
   if (!api || !workIdentifiers) return;
 
   const SAFE_REFERENCE_ID = /^[A-Za-z0-9_.:-]{1,256}$/;

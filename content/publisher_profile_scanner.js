@@ -4,7 +4,7 @@
   if (window.notandiaPublisherScannerInjected) return;
   window.notandiaPublisherScannerInjected = true;
 
-  const api = window.NotandiaPublisherProfiles;
+  const api = globalThis.NotandiaPublisherProfiles;
   const sourceContext = window.NotandiaSourceContext;
   if (!api || !sourceContext) return;
 

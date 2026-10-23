@@ -130,6 +130,6 @@ test('loads the mapper before every browser scanner that consumes scholarly IDs'
   assert.ok(mapperIndex < scripts.indexOf('content/publisher_profile_scanner.js'));
   assert.ok(mapperIndex < scripts.indexOf('content/integrity_scanner.js'));
   assert.ok(mapperIndex < scripts.indexOf('content/ncbi_context_bridge.js'));
-  assert.match(source('content/ncbi_context_bridge.js'), /window\.NotandiaWorkIdentifiers/);
+  assert.match(source('content/ncbi_context_bridge.js'), /globalThis\.NotandiaWorkIdentifiers/);
   assert.match(source('content/ncbi_context_bridge.js'), /resolutionMapsFromNCBI/);
 });

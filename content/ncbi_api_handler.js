@@ -134,7 +134,7 @@
 
   function resolutionMapFromRecords(records, idType, ids) {
     const doiById = new Map(ids.map(id => [id, null]));
-    const workIds = window.NotandiaWorkIdentifiers;
+    const workIds = globalThis.NotandiaWorkIdentifiers;
     if (records.length && workIds?.resolutionMapsFromNCBI) {
       const maps = workIds.resolutionMapsFromNCBI(records);
       const sourceMap = idType === 'pmid' ? maps.pmidToDoi : idType === 'pmcid' ? maps.pmcidToDoi : null;
