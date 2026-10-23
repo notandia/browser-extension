@@ -16,6 +16,18 @@
       </div>
     </header>
 
+    <section class="card" aria-labelledby="languageHeading">
+      <h2 id="languageHeading">Language</h2>
+      <label class="setting-line" for="interfaceLanguageOptions">
+        <span>Extension language<small>Choose the language for Quick settings and full Settings. Labels added to open pages update when you save.</small></span>
+        <select id="interfaceLanguageOptions">
+          <option value="system">Use browser language</option>
+          <option value="en">English</option>
+          <option value="it">Italian</option>
+        </select>
+      </label>
+    </section>
+
     <section class="card" aria-labelledby="publisherHeading">
       <h2 id="publisherHeading">Publishing concerns</h2>
       <p class="explanation">MDPI and Frontiers start with highlighting. Choose a color and action for each publisher.</p>
@@ -65,6 +77,8 @@
     <div class="button-row"><button id="save" type="button">Save all settings</button></div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
   </main>
+  <script src="shared/localization.js"></script>
+  <script src="shared/status_messages.js"></script>
   <script src="shared/community_publishing_data.js"></script>
   <script src="shared/community_publishing.js"></script>
   <script src="shared/publisher_profiles.js"></script>

@@ -100,6 +100,7 @@
       container.appendChild(badge);
     }
     element.prepend(container);
+    globalThis.NotandiaI18n?.localize(container);
   }
 
   function styleSignature(matches) {
@@ -179,6 +180,7 @@
         }
         const description = originalInlineDescriptions.get(anchor);
         anchor.setAttribute('aria-description', [description, `Publisher: ${visual.profileName}`, api.publicationTypeLabel(visual.publicationType)].filter(Boolean).join('. '));
+        globalThis.NotandiaI18n?.localizeAttribute(anchor, 'aria-description');
         anchor.style.setProperty('--notandia-profile-color', visual.color);
         anchor.style.setProperty('--notandia-profile-ink', api.readableColor(visual.color));
         managedInlineAnchors.add(anchor);

@@ -252,6 +252,7 @@
         container.appendChild(badge);
       }
       element.prepend(container);
+      globalThis.NotandiaI18n?.localize(container);
     }
 
     if (visual.action === 'hide') element.style.setProperty('display', 'none', 'important');

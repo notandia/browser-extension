@@ -97,6 +97,9 @@ button.text-button { background: transparent; color: #2b5c88; padding: 3px 4px; 
 .quick-profile select { max-width: 105px; }
 .checkbox-label { display: flex; align-items: flex-start; gap: 8px; margin: 9px 0; }
 .checkbox-label small { display: block; color: var(--muted); }
+.language-setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0; }
+.language-setting > span { display: block; min-width: 0; }
+.language-setting select { width: min(240px, 45%); min-width: 170px; min-height: 38px; padding: 8px; border: 1px solid #48627a; border-radius: 8px; background: #fff; color: var(--ink); font: inherit; }
 
 .overview-heading-row { align-items: center; }
 .overview-heading-row h2 { font-size: 18px; }

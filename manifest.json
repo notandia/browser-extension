@@ -43,6 +43,7 @@
         "content/site_reference_compatibility.css"
       ],
       "js": [
+        "shared/localization.js",
         "shared/work_identifiers.js",
         "shared/community_publishing_data.js",
       "shared/community_publishing.js",

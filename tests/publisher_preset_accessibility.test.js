@@ -61,6 +61,7 @@ test('settings name each publisher control and render only trusted rationale lin
     chrome: { runtime: { getManifest: () => ({}) }, storage: { sync: { get: (defaults, callback) => callback(defaults), set: () => {} } } }
   };
   vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync('shared/status_messages.js', 'utf8'), sandbox);
   vm.runInContext(fs.readFileSync('options.js', 'utf8'), sandbox);
   document.dispatchEvent(new Event('DOMContentLoaded'));
   assert.equal(document.querySelectorAll('.profile-row').length, 2);
@@ -116,6 +117,7 @@ test('simplified settings preserve saved additional profiles and allow their rem
       set: values => { if (values.publisherWatchlist) saved = values.publisherWatchlist; }
     } } }
   };
+  vm.runInNewContext(fs.readFileSync('shared/status_messages.js', 'utf8'), sandbox);
   vm.runInNewContext(fs.readFileSync('options.js', 'utf8'), sandbox);
   document.dispatchEvent(new Event('DOMContentLoaded'));
   assert.equal(saved.profiles.length, 3);

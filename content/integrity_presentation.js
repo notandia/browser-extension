@@ -162,6 +162,7 @@
         chip.textContent = `${definition.icon || '•'} ${definition.label || record.primaryStatus}`;
         chip.title = `Formal post-publication signal for ${record.doi || 'this reference'}`;
         reference.appendChild(chip);
+        globalThis.NotandiaI18n?.localize(chip);
       }
       styleInlineCitations(record, definition);
     }

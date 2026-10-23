@@ -139,6 +139,7 @@ test('saving individual checks preserves mixed choices and completes setup', asy
         }
       }
     };
+    vm.runInNewContext(fs.readFileSync(require.resolve('../shared/status_messages.js'), 'utf8'), sandbox);
     vm.runInNewContext(fs.readFileSync(require.resolve('../options.js'), 'utf8'), sandbox);
     document.dispatchEvent(new Event('DOMContentLoaded'));
     await new Promise(resolve => setImmediate(resolve));

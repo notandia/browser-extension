@@ -56,6 +56,14 @@
 
 
       <label class="checkbox-label" for="loggingEnabled"><input type="checkbox" id="loggingEnabled"><span>Diagnostic logging</span></label>
+      <label class="language-setting" for="interfaceLanguagePopup">
+        <span>Language</span>
+        <select id="interfaceLanguagePopup">
+          <option value="system">Use browser language</option>
+          <option value="en">English</option>
+          <option value="it">Italian</option>
+        </select>
+      </label>
       <button id="save" type="button">Save quick settings</button>
       <div id="status" role="status" aria-live="polite"></div>
     </section>
@@ -131,6 +139,8 @@
       </div>
     </details>
   </main>
+  <script src="shared/localization.js"></script>
+  <script src="shared/status_messages.js"></script>
   <script src="shared/community_publishing_data.js"></script>
   <script src="shared/community_publishing.js"></script>
   <script src="shared/publisher_profiles.js"></script>
