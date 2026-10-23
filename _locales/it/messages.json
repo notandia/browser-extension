@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Notandia",
+    "description": "Nome dell'estensione."
+  },
+  "extDesc": {
+    "message": "Informazioni sugli editori e avvisi post-pubblicazione per la letteratura scientifica. Open source.",
+    "description": "Breve descrizione dello scopo dell'estensione."
+  }
+}

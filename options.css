@@ -24,3 +24,13 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 #concernPreset { max-width: 100%; min-height: 38px; margin: 8px 8px 8px 0; font: inherit; color: var(--ink); background: #fff; border: 1px solid #48627a; }
 
 .profile-test-link { display: inline-block; margin-top: 8px; color: #175cd3; font-size: 13px; }
+
+.language-setting{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:12px 0}
+.language-setting>span{display:block;min-width:0}
+.language-setting small{display:block;color:var(--muted)}
+.language-setting select{width:min(240px,45%);min-width:170px;min-height:38px;padding:8px;border:1px solid #48627a;border-radius:8px;background:#fff;color:var(--ink);font:inherit}
+.custom-grid{grid-template-columns:minmax(0,1.1fr) minmax(0,1.4fr) minmax(0,1.2fr) minmax(110px,130px) minmax(70px,90px)}
+.custom-grid label{display:flex;flex-direction:column;align-items:stretch;gap:5px;min-width:0;color:var(--muted);font-size:12px}
+.custom-grid input:not([type=color]),.custom-grid select{display:block;width:100%;min-width:0}
+.custom-grid input[type=color]{width:90px;height:38px;padding:3px}
+@media(max-width:800px){.custom-grid{grid-template-columns:minmax(0,1fr)}}

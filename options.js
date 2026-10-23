@@ -8,17 +8,21 @@ const profileList = $('profileList');
 const status = $('status');
 let watchlist = api.defaultSettings();
 
+const writeStatus = globalThis.NotandiaStatusMessages.create(status, 5000);
+
 function setStatus(message, error = false) {
-  status.textContent = message;
+  writeStatus(message);
   status.classList.toggle('error', error);
-  if (message) setTimeout(() => {
-    if (status.textContent === message) status.textContent = '';
-  }, 5000);
 }
 
 function usesFirefoxDataConsent() {
   const optional = chrome.runtime.getManifest().browser_specific_settings?.gecko?.data_collection_permissions?.optional;
   return Array.isArray(optional) && optional.includes('websiteContent') && Boolean(globalThis.browser?.permissions);
+}
+
+function selectOption(select, value) {
+  const option = Array.from(select?.options || []).find(item => item.value === value);
+  if (option) option.selected = true;
 }
 
 async function hasFirefoxDataConsent() {
@@ -256,6 +260,7 @@ $('save').addEventListener('click', () => {
     const mdpi = watchlist.profiles.find(profile => profile.id === 'mdpi');
     chrome.storage.sync.set({
       publisherWatchlist: watchlist,
+      interfaceLanguage: $('interfaceLanguageOptions').value,
       integrityLookupsEnabled: integrityEnabled,
       ncbiApiEnabled: ncbiEnabled,
       loggingEnabled: $('loggingEnabledOptions').checked,
@@ -268,11 +273,13 @@ $('save').addEventListener('click', () => {
       chrome.tabs?.query?.({}, tabs => {
         for (const tab of tabs || []) {
           if (!Number.isInteger(tab.id)) continue;
+          chrome.tabs.sendMessage(tab.id, { type: 'notandiaSetInterfaceLanguage', language: $('interfaceLanguageOptions').value }, () => void chrome.runtime.lastError);
           chrome.tabs.sendMessage(tab.id, { type: 'forcePublisherRescan' }, () => void chrome.runtime.lastError);
           chrome.tabs.sendMessage(tab.id, { type: 'forceIntegrityRescan' }, () => void chrome.runtime.lastError);
         }
       });
       setStatus('Settings saved.');
+      globalThis.NotandiaI18n?.setLanguage($('interfaceLanguageOptions').value);
     });
   })();
 });
@@ -285,10 +292,12 @@ function load() {
     potentialMdpiHighlightColor: null,
     integrityLookupsEnabled: false,
     ncbiApiEnabled: false,
-    loggingEnabled: false
+    loggingEnabled: false,
+    interfaceLanguage: 'system'
   }, stored => {
     if (chrome.runtime.lastError) return setStatus('Could not load settings.', true);
     watchlist = api.migrateLegacySettings(stored);
+    selectOption($('interfaceLanguageOptions'), ['system', 'en', 'it'].includes(stored.interfaceLanguage) ? stored.interfaceLanguage : 'system');
     renderProfiles();
     $('ncbiApiEnabledOptions').checked = stored.ncbiApiEnabled === true;
     $('loggingEnabledOptions').checked = stored.loggingEnabled === true;

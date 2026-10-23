@@ -4,9 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const api = globalThis.NotandiaPublisherProfiles;
   if (!api) throw new Error('Publisher profile runtime failed to load');
   const $ = id => document.getElementById(id);
+  const selectOption = (select, value) => {
+    const option = Array.from(select?.options || []).find(item => item.value === value);
+    if (option) option.selected = true;
+  };
   const el = {
     settings: $('settingsIcon'), panel: $('settingsPanel'), quickProfiles: $('quickProfiles'), save: $('save'), status: $('status'),
-    integrity: $('integrityLookupsEnabled'), ncbi: $('ncbiApiEnabledPopup'), logging: $('loggingEnabled'), community: $('communityWarningsEnabledPopup'), manage: $('managePublishers'),
+    integrity: $('integrityLookupsEnabled'), ncbi: $('ncbiApiEnabledPopup'), logging: $('loggingEnabled'), language: $('interfaceLanguagePopup'), community: $('communityWarningsEnabledPopup'), manage: $('managePublishers'),
     articleSection: $('articleContextSection'), article: $('articleContext'), articleSummary: $('articleContextSummary'), integrityCoverage: $('integrityCoverage'),
     contextList: $('contextList'), referencesSummary: $('referencesSummary'), contextFilter: $('contextFilter'), contextSort: $('contextSort'),
     rescan: $('rescan'), report: $('reportIssue'), reportCategory: $('reportCategory')
@@ -21,10 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let restoreInFlight = false;
   let reloadQueued = false;
 
-  function setStatus(message) {
-    el.status.textContent = message;
-    if (message) setTimeout(() => { if (el.status.textContent === message) el.status.textContent = ''; }, 3500);
-  }
+  const setStatus = globalThis.NotandiaStatusMessages.create(el.status, 3500);
 
   function rgba(hex, alpha) {
     const match = /^#([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i.exec(String(hex || ''));
@@ -512,6 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const mdpi = watchlist.profiles.find(profile => profile.id === 'mdpi');
       chrome.storage.sync.set({
         publisherWatchlist: watchlist,
+        interfaceLanguage: el.language.value,
         integrityLookupsEnabled: el.integrity.checked,
         ncbiApiEnabled: el.ncbi.checked,
         loggingEnabled: el.logging.checked,
@@ -522,6 +524,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chrome.runtime.lastError) return setStatus('Could not save settings.');
         chrome.storage.local?.set({ notandiaLookupSetupDismissed: true }, () => void chrome.runtime.lastError);
         setStatus('Settings saved.');
+        globalThis.NotandiaI18n?.setLanguage(el.language.value);
+        chrome.tabs.query({}, tabs => {
+          for (const tab of tabs || []) {
+            if (!Number.isInteger(tab.id)) continue;
+            chrome.tabs.sendMessage(tab.id, { type: 'notandiaSetInterfaceLanguage', language: el.language.value }, () => void chrome.runtime.lastError);
+          }
+        });
         forceRescan();
       });
     })();
@@ -556,9 +565,11 @@ document.addEventListener('DOMContentLoaded', () => {
     potentialMdpiHighlightColor: null,
     integrityLookupsEnabled: false,
     ncbiApiEnabled: false,
-    loggingEnabled: false
+    loggingEnabled: false,
+    interfaceLanguage: 'system'
   }, stored => {
     watchlist = api.migrateLegacySettings(stored);
+    selectOption(el.language, ['system', 'en', 'it'].includes(stored.interfaceLanguage) ? stored.interfaceLanguage : 'system');
     renderQuickProfiles();
     el.ncbi.checked = stored.ncbiApiEnabled === true;
     el.logging.checked = stored.loggingEnabled === true;
