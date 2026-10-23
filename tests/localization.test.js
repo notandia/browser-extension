@@ -88,6 +88,7 @@ test('extension pages translate joined summaries and privacy text without transl
     protocol: 'chrome-extension:',
     html: `<html><body>
       <p id="summary">2 publisher matches · 1 work with formal updates</p>
+      <p id="singular">1 publisher match</p>
       <p id="privacy">Crossref receives DOIs. NCBI receives DOI, PMID or PMCID identifiers. Page text, search queries and page addresses are not sent.</p>
       <p id="permission">Firefox data permission was not granted.</p>
       <div class="context-item"><p id="citation">Expression of concern; full scholarly citation text.</p></div>
@@ -96,11 +97,13 @@ test('extension pages translate joined summaries and privacy text without transl
   assert.equal(observerCount(), 1);
   i18n.setLanguage('it');
   assert.equal(document.getElementById('summary').textContent, '2 corrispondenze con editori · 1 articolo con un avviso post-pubblicazione');
+  assert.equal(document.getElementById('singular').textContent, '1 corrispondenza con un editore');
   assert.equal(document.getElementById('privacy').textContent, 'Crossref riceve i DOI. NCBI riceve identificativi DOI, PMID o PMCID. Il testo delle pagine, le query di ricerca e gli indirizzi delle pagine non vengono inviati.');
   assert.equal(document.getElementById('permission').textContent, 'Non hai concesso l’autorizzazione richiesta da Firefox.');
   assert.equal(document.getElementById('citation').textContent, 'Expression of concern; full scholarly citation text.');
   i18n.setLanguage('en');
   assert.equal(document.getElementById('summary').textContent, '2 publisher matches · 1 work with formal updates');
+  assert.equal(document.getElementById('singular').textContent, '1 publisher match');
   assert.equal(document.getElementById('privacy').textContent, 'Crossref receives DOIs. NCBI receives DOI, PMID or PMCID identifiers. Page text, search queries and page addresses are not sent.');
 });
 

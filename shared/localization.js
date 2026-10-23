@@ -172,7 +172,7 @@
     if ((match = source.match(/^([!•×✎–≡↩])\s*(Retracted|Expression of concern|Corrected|Withdrawn(?: or removed)?|Duplicate publication|Reinstated|Removed)$/))) return `${match[1]} ${italian[match[2]]}`;
     if ((match = source.match(/^(\d+) references? with context$/))) return `${match[1]} ${Number(match[1]) === 1 ? 'riferimento con contesto' : 'riferimenti con contesto'}`;
     if ((match = source.match(/^(\d+) of (\d+) scanned references match your watchlist$/))) return `${match[1]} di ${match[2]} riferimenti analizzati corrispondono agli editori monitorati`;
-    if ((match = source.match(/^(\d+) publisher matches?$/))) return `${match[1]} ${Number(match[1]) === 1 ? 'corrispondenza con un editore' : 'corrispondenze con editori'}`;
+    if ((match = source.match(/^(\d+) publisher match(?:es)?$/))) return `${match[1]} ${Number(match[1]) === 1 ? 'corrispondenza con un editore' : 'corrispondenze con editori'}`;
     if ((match = source.match(/^(\d+) works? with formal updates$/))) return `${match[1]} ${Number(match[1]) === 1 ? 'articolo con un avviso post-pubblicazione' : 'articoli con avvisi post-pubblicazione'}`;
     if ((match = source.match(/^Checking formal update records… (\d+)\/(\d+) \((\d+)%\)$/))) return `Verifica degli avvisi post-pubblicazione… ${match[1]}/${match[2]} (${match[3]}%)`;
     if ((match = source.match(/^Current settings: Crossref (on|off); NCBI (on|off)\.$/))) return `Impostazioni attuali: Crossref ${match[1] === 'on' ? 'attivo' : 'disattivato'}; NCBI ${match[2] === 'on' ? 'attivo' : 'disattivato'}.`;

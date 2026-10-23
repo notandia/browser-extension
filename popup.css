@@ -334,3 +334,13 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .publisher-warning-sources a { color: #145b9e; overflow-wrap: anywhere; }
 .publisher-warning-sources a:focus-visible { outline: 3px solid #175cd3; outline-offset: 2px; }
 .publisher-evidence summary:focus-visible, .publisher-evidence a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+
+/* Touch-browser popovers must fit the available sheet width. */
+@media (hover: none) and (pointer: coarse) {
+  html { width: 100%; }
+  body { width: 100%; max-width: 480px; }
+  .popup-header { flex-wrap: wrap; gap: 10px; }
+  .language-setting { flex-wrap: wrap; gap: 8px; }
+  .language-setting select { width: 100%; min-width: 0; }
+}
