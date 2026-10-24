@@ -6,6 +6,18 @@ La lingua predefinita segue la lingua del browser. In **Impostazioni rapide** o 
 
 Per “expression of concern” l’interfaccia usa **“Espressione di preoccupazione”**, il termine della comunicazione scientifico-editoriale italiana. Indica che un editore invita a leggere un articolo con cautela mentre vengono chiariti i dubbi; non equivale di per sé a una ritrattazione o a una correzione.
 
+## Glossario
+
+| Termine inglese | Resa italiana | Uso |
+|---|---|---|
+| Expression of concern | Espressione di preoccupazione | Avviso editoriale che segnala dubbi ancora in esame; non implica una ritrattazione o una correzione. |
+| Formal post-publication update | Avviso post-pubblicazione | Termine ombrello per ritrattazioni, correzioni, espressioni di preoccupazione e altri aggiornamenti editoriali. |
+| Publisher match | Corrispondenza con un editore | Segnalazione che un riferimento o una pagina corrisponde a un editore monitorato; non è un giudizio sulla qualità dell’articolo. |
+| Publisher watchlist | Elenco degli editori monitorati | Elenco degli editori scelti dall’utente. Nel testo corrente si preferisce spesso la forma più breve “editori monitorati”. |
+| Badge | Etichetta | Modalità che aggiunge un contrassegno testuale alla corrispondenza; nell’interfaccia, “Solo etichetta”. |
+| Retraction / retracted | Ritrattazione / ritrattato | Usare “ritrattazione” per l’atto editoriale e “ritrattato” per descrivere l’articolo. |
+
+
 ## Testi fissi
 
 | Testo inglese | Testo italiano |
@@ -303,3 +315,57 @@ Queste frasi compaiono nelle schede che spiegano perché un editore o una piatta
 | Testo inglese | Testo italiano |
 |---|---|
 | Open-source publisher context and formal post-publication signals for scholarly literature. | Informazioni sugli editori e avvisi post-pubblicazione per la letteratura scientifica. Open source. |
+
+## Scheda Chrome Web Store in italiano
+
+Descrizione italiana salvata nella scheda `Italian – it` e inclusa nella richiesta di revisione Chrome Web Store per la versione 0.1.6:
+
+> Ti capita di aprire altre schede per controllare chi ha pubblicato un articolo, gli aggiornamenti successivi alla pubblicazione o i suoi riferimenti bibliografici?
+>
+> Notandia porta queste informazioni direttamente nella pagina che stai già leggendo.
+>
+> Precedentemente nota come MDPI Filter, Notandia ti aiuta a individuare gli editori che hai scelto di monitorare e a seguire le citazioni mentre consulti la letteratura scientifica: dai risultati di ricerca agli articoli di rivista e alle voci enciclopediche. Nelle pagine supportate, evidenzia i riferimenti corrispondenti e le citazioni o le note a piè di pagina collegate.
+>
+> 🔍 INDIVIDUA GLI EDITORI CHE VUOI MONITORARE
+>
+> I profili di MDPI e Frontiers sono inclusi e pronti all’uso. Puoi anche creare elenchi personalizzati basati su domini e prefissi DOI.
+>
+> Scegli come mostrare le corrispondenze: aggiungi un’etichetta, evidenziale, attenuala o nascondila. Puoi gestire separatamente ogni editore e scegliere i colori più adatti.
+>
+> La corrispondenza con un editore ti aiuta a organizzare le informazioni che vuoi tenere d’occhio. Non esprime un giudizio sulla qualità dell’articolo.
+>
+> 📚 TROVA IL RIFERIMENTO, SEGUI LA CITAZIONE
+>
+> Consultare una bibliografia lunga non dovrebbe costringerti a cercare ogni voce una per una.
+>
+> Nelle pagine supportate, Notandia evidenzia i riferimenti corrispondenti e le citazioni o le note a piè di pagina collegate. Apri il riquadro dell’estensione per una panoramica, poi passa direttamente a un riferimento pertinente senza perdere il punto in cui eri arrivato nell’articolo.
+>
+> ⚠️ SCOPRI GLI AGGIORNAMENTI SUCCESSIVI ALLA PUBBLICAZIONE
+>
+> Una citazione può restare in un articolo anche molto tempo dopo che il lavoro citato è stato corretto o ritrattato.
+>
+> Attiva i controlli facoltativi sugli aggiornamenti delle pubblicazioni per cercare tramite l’API di Crossref ritrattazioni, correzioni, espressioni di preoccupazione e altri avvisi formali.
+>
+> Questi avvisi sono mostrati separatamente dalle corrispondenze con gli editori, così puoi distinguere chi ha pubblicato un articolo da ciò che è avvenuto dopo la pubblicazione.
+>
+> La copertura dipende dai metadati DOI disponibili. Un controllo non risolto o non riuscito non equivale a un esito senza problemi; inoltre, l’assenza di un avviso non garantisce che l’articolo sia privo di criticità.
+>
+> 🎛️ PERSONALIZZA LA TUA ESPERIENZA DI LETTURA
+>
+> Attiva i profili degli editori che ti interessano, personalizzane l’aspetto e crea elenchi di monitoraggio. Puoi importare o esportare le impostazioni e decidere se abilitare le ricerche esterne di metadati e gli avvisi sugli aggiornamenti delle pubblicazioni.
+>
+> 🛡️ LE TUE PAGINE RESTANO NEL BROWSER
+>
+> L’analisi delle pagine e il confronto con gli editori avvengono localmente. Le ricerche esterne sono disattivate per impostazione predefinita.
+>
+> Quando le attivi, l’API PMC ID Converter di NCBI riceve identificativi accademici convalidati per aiutare a identificare gli articoli; l’API di Crossref riceve DOI normalizzati per cercare aggiornamenti delle pubblicazioni. Questi servizi ricevono anche i normali metadati di rete, come il tuo indirizzo IP. Le richieste non includono credenziali né referrer.
+>
+> Notandia non invia allo sviluppatore le pagine complete, il testo delle citazioni, le query di ricerca, la cronologia di navigazione, le impostazioni degli editori, i cookie o gli identificativi degli account.
+>
+> Niente pubblicità, analisi del prodotto o codice eseguibile remoto.
+>
+> 🧩 OPEN SOURCE E INDIPENDENTE
+>
+> Il codice di Notandia è consultabile. Il progetto è indipendente e non è affiliato a editori o fornitori di metadati, né è da loro approvato.
+>
+> Meno verifiche manuali. Più contesto, proprio dove serve.
