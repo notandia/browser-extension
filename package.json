@@ -11,6 +11,6 @@
   },
   "license": "AGPL-3.0-or-later",
   "devDependencies": {
-    "linkedom": "^0.18.13"
+    "linkedom": "^0.18.14"
   }
 }
